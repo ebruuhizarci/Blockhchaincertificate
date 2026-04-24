@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <title>Belge Doğrulama Sistemi</title>
+</head>
+<body>
+    <h2>Sertifika / Belge Yükle</h2>
+    <input type="file" id="dosyaSecici">
+    <button onclick="dosyaYukle()">Hash Hesapla ve Gönder</button>
+    
+    <p id="sonuc"></p>
+
+    <script>
+        async function dosyaYukle() {
+            const fileInput = document.getElementById('dosyaSecici');
+            const sonucAlani = document.getElementById('sonuc');
+            
+            if (fileInput.files.length === 0) {
+                alert("Lütfen bir dosya seçin!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            sonucAlani.innerText = "İşleniyor...";
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                sonucAlani.innerHTML = `<strong>Dosya Hash:</strong> ${data.hash}`;
+            } catch (error) {
+                sonucAlani.innerText = "Hata: Backend'e bağlanılamadı!";
+            }
+        }
+    </script>
+</body>
+</html>
