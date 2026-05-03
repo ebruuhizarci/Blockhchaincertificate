@@ -1,40 +1,97 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <meta charset="UTF-8">
     <title>Belge Doğrulama Sistemi</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 20px; line-height: 1.6; }
+        .panel { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 8px; background: #f9f9f9; }
+        h2 { color: #333; border-bottom: 2px solid #333; padding-bottom: 5px; }
+        .doc-item { background: white; padding: 10px; border: 1px solid #eee; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+        button { cursor: pointer; padding: 8px 15px; margin: 5px; }
+        .approve-btn { background: #4CAF50; color: white; border: none; }
+        .reject-btn { background: #f44336; color: white; border: none; }
+    </style>
 </head>
 <body>
-    <h2>Sertifika / Belge Yükle</h2>
-    <input type="file" id="dosyaSecici">
-    <button onclick="dosyaYukle()">Hash Hesapla ve Gönder</button>
-    
-    <p id="sonuc"></p>
+
+    <h1>🔐 Dijital Belge Onay Platformu</h1>
+
+    <div class="panel">
+        <h2>1. Belge Yükle (Kullanıcı)</h2>
+        <input type="text" id="uploaderName" placeholder="Adınız Soyadınız"><br><br>
+        <select id="targetInstitution">
+            <option value="BEUN">Bülent Ecevit Üniversitesi</option>
+            <option value="SAGLIK_BAKANLIGI">Sağlık Bakanlığı</option>
+            <option value="OZEL_SIRKET">Özel Şirket</option>
+        </select><br><br>
+        <input type="file" id="fileInput">
+        <button onclick="uploadFile()">Kuruma Gönder</button>
+        <p id="uploadStatus"></p>
+    </div>
+
+    <div class="panel">
+        <h2>2. Onay Paneli (Kurum Yetkilisi)</h2>
+        <input type="text" id="instLogin" placeholder="Kurum Adı (Örn: BEUN)">
+        <button onclick="fetchPendingDocs()">Bekleyen Belgeleri Getir</button>
+        
+        <div id="pendingList">
+            </div>
+    </div>
 
     <script>
-        async function dosyaYukle() {
-            const fileInput = document.getElementById('dosyaSecici');
-            const sonucAlani = document.getElementById('sonuc');
-            
-            if (fileInput.files.length === 0) {
-                alert("Lütfen bir dosya seçin!");
-                return;
-            }
+        const API_BASE = "http://127.0.0.1:5000";
+
+        // BELGE YÜKLEME FONKSİYONU
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const uploader = document.getElementById('uploaderName').value;
+            const inst = document.getElementById('targetInstitution').value;
+
+            if(!fileInput.files[0] || !uploader) return alert("Lütfen tüm alanları doldurun!");
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
+            formData.append('uploader_name', uploader);
+            formData.append('target_institution', inst);
 
-            sonucAlani.innerText = "İşleniyor...";
+            const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('uploadStatus').innerText = data.message || data.error;
+        }
 
-            try {
-                const response = await fetch('http://127.0.0.1:5000/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await response.json();
-                sonucAlani.innerHTML = `<strong>Dosya Hash:</strong> ${data.hash}`;
-            } catch (error) {
-                sonucAlani.innerText = "Hata: Backend'e bağlanılamadı!";
-            }
+        // BEKLEYEN BELGELERİ LİSTELEME
+        async function fetchPendingDocs() {
+            const instName = document.getElementById('instLogin').value;
+            const res = await fetch(`${API_BASE}/pending-docs/${instName}`);
+            const docs = await res.json();
+            
+            const listDiv = document.getElementById('pendingList');
+            listDiv.innerHTML = "";
+
+            docs.forEach(doc => {
+                listDiv.innerHTML += `
+                    <div class="doc-item">
+                        <span><strong>${doc.filename}</strong> - Gönderen: ${doc.uploader}</span>
+                        <div>
+                            <button class="approve-btn" onclick="updateStatus(${doc.id}, 'approved')">Onayla</button>
+                            <button class="reject-btn" onclick="updateStatus(${doc.id}, 'rejected')">Reddet</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // ONAY/RED GÜNCELLEME
+        async function updateStatus(docId, newStatus) {
+            const res = await fetch(`${API_BASE}/update-status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: docId, status: newStatus })
+            });
+            const data = await res.json();
+            alert(data.message);
+            fetchPendingDocs(); // Listeyi yenile
         }
     </script>
 </body>
