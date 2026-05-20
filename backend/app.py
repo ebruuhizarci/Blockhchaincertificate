@@ -1,10 +1,21 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import hashlib
-from database import get_db_connection 
+from database import get_db_connection, get_db_error
 
 app = Flask(__name__)
 CORS(app)
+
+
+def _is_sqlite(conn):
+    return conn.__class__.__module__.startswith("sqlite3")
+
+
+def _sql(conn, query):
+    # SQLite'da placeholder `%s` yerine `?` kullanılmalı.
+    if _is_sqlite(conn):
+        return query.replace("%s", "?")
+    return query
 
 @app.route("/")
 def home():
@@ -29,53 +40,91 @@ def upload_file():
 
     conn = get_db_connection()
     if conn:
+        cur = None
         try:
             cur = conn.cursor()
-            # Status varsayılan olarak 'pending' (beklemede) başlar
+
             cur.execute(
-                "INSERT INTO documents (filename, file_hash, uploader_name, target_institution, status) VALUES (%s, %s, %s, %s, 'pending')",
+                _sql(
+                    conn,
+                    "SELECT id, filename, status, target_institution FROM documents WHERE file_hash = %s",
+                ),
+                (file_hash,),
+            )
+            existing = cur.fetchone()
+            if existing:
+                return jsonify({
+                    "error": "Bu dosya zaten sisteme yüklenmiş (aynı içerik).",
+                    "message": (
+                        f"Kayıt: {existing[1]} | Durum: {existing[2]} | "
+                        f"Kurum: {existing[3]}. Bekleyen listeden onaylayabilir veya farklı bir dosya deneyebilirsiniz."
+                    ),
+                    "hash": file_hash,
+                    "doc_id": existing[0],
+                    "status": existing[2],
+                }), 409
+
+            cur.execute(
+                _sql(
+                    conn,
+                    "INSERT INTO documents (filename, file_hash, uploader_name, target_institution, status) VALUES (%s, %s, %s, %s, 'pending')",
+                ),
                 (file.filename, file_hash, uploader_name, target_institution)
             )
             conn.commit()
-            cur.close()
-            conn.close()
             return jsonify({
                 "message": "Belge başarıyla yüklendi, kurum onayı bekleniyor.",
                 "hash": file_hash,
                 "status": "pending"
             })
         except Exception as e:
+            err = str(e).lower()
+            if "unique" in err or "duplicate" in err:
+                return jsonify({
+                    "error": "Bu dosya zaten kayıtlı (aynı hash).",
+                    "hash": file_hash,
+                }), 409
             return jsonify({"error": f"Veritabanı hatası: {str(e)}"}), 500
-    return jsonify({"error": "Veritabanı bağlantısı kurulamadı!"}), 500
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
+    return jsonify({"error": "Veritabanı bağlantısı kurulamadı!", "details": get_db_error()}), 500
 
 # --- 2. KURUM TARAFI: BEKLEYEN BELGELERİ LİSTELE ---
 @app.route("/pending-docs/<institution_name>", methods=["GET"])
 def get_pending_docs(institution_name):
     conn = get_db_connection()
     if conn:
+        cur = None
         try:
             cur = conn.cursor()
             # Sadece o kuruma ait ve beklemede olanları çekiyoruz
             cur.execute(
-                "SELECT id, filename, uploader_name, created_at FROM documents WHERE target_institution = %s AND status = 'pending'",
+                _sql(
+                    conn,
+                    "SELECT id, filename, uploader_name, created_at, file_hash FROM documents WHERE target_institution = %s AND status = 'pending'",
+                ),
                 (institution_name,)
             )
             docs = cur.fetchall()
-            cur.close()
-            conn.close()
-            
             output = []
             for doc in docs:
                 output.append({
                     "id": doc[0],
                     "filename": doc[1],
                     "uploader": doc[2],
-                    "date": doc[3]
+                    "date": doc[3],
+                    "file_hash": doc[4]
                 })
             return jsonify(output)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    return jsonify({"error": "Bağlantı hatası"}), 500
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
+    return jsonify({"error": "Bağlantı hatası", "details": get_db_error()}), 500
 
 # --- 3. KURUM TARAFI: ONAY VEYA RED İŞLEMİ ---
 @app.route("/update-status", methods=["POST"])
@@ -90,35 +139,42 @@ def update_status():
 
     conn = get_db_connection()
     if conn:
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE documents SET status = %s, blockchain_tx_hash = %s WHERE id = %s",
+                _sql(
+                    conn,
+                    "UPDATE documents SET status = %s, blockchain_tx_hash = %s WHERE id = %s",
+                ),
                 (new_status, tx_hash, doc_id)
             )
             conn.commit()
-            cur.close()
-            conn.close()
             return jsonify({"message": f"Belge durumu {new_status} olarak güncellendi."})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    return jsonify({"error": "Bağlantı hatası"}), 500
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
+    return jsonify({"error": "Bağlantı hatası", "details": get_db_error()}), 500
 
 # --- 4. HERKESE AÇIK: BELGE DOĞRULAMA (SORGULAMA) ---
 @app.route("/verify/<hash_val>", methods=["GET"])
 def verify_doc(hash_val):
     conn = get_db_connection()
     if conn:
+        cur = None
         try:
             cur = conn.cursor()
             cur.execute(
-                "SELECT filename, target_institution, status, blockchain_tx_hash FROM documents WHERE file_hash = %s",
+                _sql(
+                    conn,
+                    "SELECT filename, target_institution, status, blockchain_tx_hash FROM documents WHERE file_hash = %s",
+                ),
                 (hash_val,)
             )
             result = cur.fetchone()
-            cur.close()
-            conn.close()
-
             if result:
                 return jsonify({
                     "exists": True,
@@ -130,7 +186,11 @@ def verify_doc(hash_val):
             return jsonify({"exists": False, "message": "Belge bulunamadı veya sahte!"})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-    return jsonify({"error": "Bağlantı hatası"}), 500
+        finally:
+            if cur:
+                cur.close()
+            conn.close()
+    return jsonify({"error": "Bağlantı hatası", "details": get_db_error()}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

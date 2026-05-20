@@ -2,19 +2,45 @@
   "name": "etherdocs-contracts",
   "version": "1.0.0",
   "description": "Etherdocs Blockchain Certificate System",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "node": "hardhat node",
+    "deploy:amoy": "hardhat ignition deploy ignition/modules/Sertifika.ts --network amoy",
+    "deploy:ignition": "hardhat ignition deploy ignition/modules/Sertifika.ts --network localhost",
+    "deploy:ignition:reset": "hardhat ignition deploy ignition/modules/Sertifika.ts --network localhost --reset",
+    "deploy:script": "hardhat run scripts/deploy.js --network localhost",
+    "sync:frontend": "node scripts/sync-frontend-config.js",
+    "setup:local": "npm run compile && npm run deploy:ignition && npm run sync:frontend",
+    "setup:amoy": "npm run compile && npm run deploy:amoy && npm run sync:frontend",
+    "test": "hardhat test"
   },
   "keywords": [],
   "author": "Tahsin",
   "license": "ISC",
-  "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.22.10",
-    "dotenv": "^16.4.5"
-  },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.0"
+    "@openzeppelin/contracts": "^5.0.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "@nomicfoundation/hardhat-ignition": "^0.15.16",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.17",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.14",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.2",
+    "chai": "^4.5.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.4",
+    "hardhat": "^2.22.17",
+    "hardhat-gas-reporter": "^2.2.2",
+    "solidity-coverage": "^0.8.14",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.2",
+    "typescript": "^5.7.2"
   }
 }

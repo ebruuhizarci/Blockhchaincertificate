@@ -2,20 +2,28 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Belge Doğrulama Sistemi</title>
+    <title>Belge Doğrulama Sistemi — Etherdocs</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 20px; line-height: 1.6; }
         .panel { border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 8px; background: #f9f9f9; }
         h2 { color: #333; border-bottom: 2px solid #333; padding-bottom: 5px; }
-        .doc-item { background: white; padding: 10px; border: 1px solid #eee; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+        .doc-item { background: white; padding: 10px; border: 1px solid #eee; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         button { cursor: pointer; padding: 8px 15px; margin: 5px; }
         .approve-btn { background: #4CAF50; color: white; border: none; }
         .reject-btn { background: #f44336; color: white; border: none; }
+        .chain-info { font-size: 0.85rem; color: #555; background: #eef; padding: 8px; border-radius: 4px; word-break: break-all; }
+        .verify-result { margin-top: 10px; padding: 10px; border-radius: 4px; }
+        .verify-ok { background: #e8f5e9; }
+        .verify-fail { background: #ffebee; }
     </style>
 </head>
 <body>
 
-    <h1>🔐 Dijital Belge Onay Platformu</h1>
+    <h1>Dijital Belge Onay Platformu</h1>
+
+    <div class="panel chain-info" id="chainInfo">
+        Blockchain yapılandırması yükleniyor...
+    </div>
 
     <div class="panel">
         <h2>1. Belge Yükle (Kullanıcı)</h2>
@@ -32,67 +40,155 @@
 
     <div class="panel">
         <h2>2. Onay Paneli (Kurum Yetkilisi)</h2>
+        <p><small>Onay için MetaMask bağlantısı ve yerel Hardhat node gerekir.</small></p>
         <input type="text" id="instLogin" placeholder="Kurum Adı (Örn: BEUN)">
         <button onclick="fetchPendingDocs()">Bekleyen Belgeleri Getir</button>
-        
-        <div id="pendingList">
-            </div>
+        <div id="pendingList"></div>
     </div>
 
+    <div class="panel">
+        <h2>3. Belge Doğrulama (Blockchain)</h2>
+        <p><small><strong>Dosya SHA-256 hash</strong> girin (yükleme mesajındaki hash). MetaMask <strong>işlem (TX) hash</strong> değil!</small></p>
+        <input type="text" id="verifyHash" placeholder="Örn: a1b2c3... (64 karakter, 0x olmadan)">
+        <button onclick="verifyOnChain()">Zincirde Doğrula</button>
+        <div id="verifyResult"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+    <script src="js/constants.js"></script>
+    <script src="js/blockchain.js"></script>
     <script>
         const API_BASE = "http://127.0.0.1:5000";
 
-        // BELGE YÜKLEME FONKSİYONU
-        async function uploadFile() {
-            const fileInput = document.getElementById('fileInput');
-            const uploader = document.getElementById('uploaderName').value;
-            const inst = document.getElementById('targetInstitution').value;
-
-            if(!fileInput.files[0] || !uploader) return alert("Lütfen tüm alanları doldurun!");
-
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            formData.append('uploader_name', uploader);
-            formData.append('target_institution', inst);
-
-            const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
-            const data = await res.json();
-            document.getElementById('uploadStatus').innerText = data.message || data.error;
+        function showChainInfo() {
+            const el = document.getElementById("chainInfo");
+            const cfg = window.ETHERDOCS_CONFIG;
+            if (!cfg || !cfg.CONTRACT_ADDRESS) {
+                el.textContent = "Kontrat yapılandırması eksik. etherdocs-contracts içinde: npm run setup:local";
+                return;
+            }
+            const configured = cfg.CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000";
+            el.innerHTML = configured
+                ? `<strong>Kontrat:</strong> ${cfg.CONTRACT_NAME}<br>
+                   <strong>Adres:</strong> ${cfg.CONTRACT_ADDRESS}<br>
+                   <strong>Chain ID:</strong> ${cfg.CHAIN_ID} &nbsp;|&nbsp; <strong>RPC:</strong> ${cfg.RPC_URL}`
+                : `Kontrat henüz deploy edilmemiş. Terminalde: <code>npm run setup:local</code> (etherdocs-contracts klasöründe)`;
         }
 
-        // BEKLEYEN BELGELERİ LİSTELEME
+        async function uploadFile() {
+            const fileInput = document.getElementById("fileInput");
+            const uploader = document.getElementById("uploaderName").value;
+            const inst = document.getElementById("targetInstitution").value;
+
+            if (!fileInput.files[0] || !uploader) return alert("Lütfen tüm alanları doldurun!");
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            formData.append("uploader_name", uploader);
+            formData.append("target_institution", inst);
+
+            const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: formData });
+            const data = await res.json();
+            document.getElementById("uploadStatus").innerText =
+                (data.message || data.error) + (data.hash ? ` | Hash: ${data.hash}` : "");
+        }
+
         async function fetchPendingDocs() {
-            const instName = document.getElementById('instLogin').value;
+            const instName = document.getElementById("instLogin").value;
             const res = await fetch(`${API_BASE}/pending-docs/${instName}`);
             const docs = await res.json();
-            
-            const listDiv = document.getElementById('pendingList');
+
+            const listDiv = document.getElementById("pendingList");
             listDiv.innerHTML = "";
 
-            docs.forEach(doc => {
+            if (!Array.isArray(docs)) {
+                listDiv.innerHTML = `<p>${docs.error || "Liste alınamadı"}</p>`;
+                return;
+            }
+
+            docs.forEach((doc) => {
+                const safeHash = (doc.file_hash || "").replace(/'/g, "");
                 listDiv.innerHTML += `
-                    <div class="doc-item">
-                        <span><strong>${doc.filename}</strong> - Gönderen: ${doc.uploader}</span>
+                    <div class="doc-item" style="flex-direction:column;align-items:stretch;">
+                        <span><strong>${doc.filename}</strong> — ${doc.uploader}</span>
+                        <small>Dosya hash: <code style="word-break:break-all;">${safeHash}</code>
+                        <button type="button" onclick="copyHash('${safeHash}')">Kopyala</button></small>
                         <div>
-                            <button class="approve-btn" onclick="updateStatus(${doc.id}, 'approved')">Onayla</button>
-                            <button class="reject-btn" onclick="updateStatus(${doc.id}, 'rejected')">Reddet</button>
+                            <button class="approve-btn" onclick="updateStatus(${doc.id}, 'approved', '${safeHash}')">Onayla (+ Blockchain)</button>
+                            <button class="reject-btn" onclick="updateStatus(${doc.id}, 'rejected', null)">Reddet</button>
                         </div>
                     </div>
                 `;
             });
         }
 
-        // ONAY/RED GÜNCELLEME
-        async function updateStatus(docId, newStatus) {
+        let _approvalInProgress = false;
+
+        async function updateStatus(docId, newStatus, fileHash) {
+            if (_approvalInProgress) return;
+            let txHash = null;
+
+            if (newStatus === "approved" && fileHash) {
+                _approvalInProgress = true;
+                try {
+                    await BlockchainService.connect();
+                    txHash = await BlockchainService.addCertificate(fileHash);
+                } catch (err) {
+                    alert("Blockchain hatası: " + (err.message || err));
+                    return;
+                } finally {
+                    _approvalInProgress = false;
+                }
+            }
+
             const res = await fetch(`${API_BASE}/update-status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: docId, status: newStatus })
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: docId, status: newStatus, blockchain_tx: txHash }),
             });
             const data = await res.json();
-            alert(data.message);
-            fetchPendingDocs(); // Listeyi yenile
+            alert(
+                data.message +
+                (txHash ? `\n\nİşlem (TX) hash:\n${txHash}` : "") +
+                (fileHash ? `\n\nDoğrulama için dosya hash:\n${fileHash}` : "")
+            );
+            fetchPendingDocs();
         }
+
+        function copyHash(hash) {
+            navigator.clipboard.writeText(hash);
+            alert("Dosya hash kopyalandı. Bölüm 3'e yapıştırıp doğrulayın.");
+        }
+
+        async function verifyOnChain() {
+            let hash = document.getElementById("verifyHash").value.trim().replace(/^0x/i, "");
+            const resultEl = document.getElementById("verifyResult");
+            if (!hash) return alert("Dosya SHA-256 hash girin");
+
+            if (hash.length === 64 && /^[0-9a-fA-F]{64}$/.test(hash)) {
+                // dosya hash formatı — OK
+            } else if (hash.length === 64) {
+                return alert("Geçersiz hash formatı. 64 hex karakter olmalı.");
+            } else {
+                resultEl.className = "verify-result verify-fail";
+                resultEl.textContent =
+                    "Bu bir işlem (TX) hash gibi görünüyor. Yükleme sırasındaki dosya SHA-256 hash'ini kullanın (Bölüm 2'de Kopyala).";
+                return;
+            }
+
+            try {
+                const onChain = await BlockchainService.verifyCertificate(hash);
+                resultEl.className = "verify-result " + (onChain ? "verify-ok" : "verify-fail");
+                resultEl.textContent = onChain
+                    ? "Sertifika blockchain kayıtlarında mevcut."
+                    : "Bu hash zincirde kayıtlı değil.";
+            } catch (err) {
+                resultEl.className = "verify-result verify-fail";
+                resultEl.textContent = "Doğrulama hatası: " + err.message;
+            }
+        }
+
+        showChainInfo();
     </script>
 </body>
 </html>
