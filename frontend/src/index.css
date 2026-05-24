@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    min-height: 100vh;
+    background-color: #0b0f1a;
+    color: #fff;
+    font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  .mor-neon {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  }
+
+  .text-mor-neon {
+    display: inline-block;
+    padding-right: 0.2em;
+    padding-left: 0.05em;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    color: transparent;
+    overflow: visible;
+  }
+
+  .glass-panel {
+    background: rgba(22, 29, 49, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 2rem;
+  }
+
+  .ether-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: rgba(17, 24, 39, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+  }
+
+  .ether-input {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid #334155;
+    background-color: #0f172a;
+    padding: 1rem;
+    font-size: 0.875rem;
+    color: #fff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .ether-input::placeholder {
+    color: #64748b;
+  }
+
+  .ether-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+  }
+
+  .ether-btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    border-radius: 1rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #fff;
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.25);
+    transition: opacity 0.15s;
+  }
+
+  .ether-btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  .ether-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ether-btn-secondary {
+    border-radius: 1rem;
+    border: 1px solid #475569;
+    background-color: rgba(30, 41, 59, 0.8);
+    padding: 0.75rem 1.5rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #fff;
+    transition: background-color 0.15s;
+  }
+
+  .ether-btn-secondary:hover:not(:disabled) {
+    background-color: #334155;
+  }
+
+  .ether-btn-indigo {
+    border-radius: 1rem;
+    background-color: #4f46e5;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #fff;
+  }
+
+  .ether-btn-emerald {
+    border-radius: 1rem;
+    background-color: #059669;
+    padding: 1rem 1.5rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #fff;
+    box-shadow: 0 10px 25px rgba(5, 150, 105, 0.25);
+  }
+
+  .panel-title-indigo {
+    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    padding-bottom: 1rem;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: #818cf8;
+  }
+
+  .panel-title-emerald {
+    border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+    padding-bottom: 1rem;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 900;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 0.4em;
+    color: #34d399;
+  }
+
+  .ether-dropzone {
+    cursor: pointer;
+    border-radius: 1.5rem;
+    border: 2px dashed #1e293b;
+    padding: 3rem;
+    text-align: center;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+
+  .ether-dropzone:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    background-color: rgba(99, 102, 241, 0.05);
+  }
+
+  .kilit-ekrani {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2rem;
+    background: rgba(11, 15, 26, 0.98);
+    padding: 2.5rem;
+    text-align: center;
+  }
+}

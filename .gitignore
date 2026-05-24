@@ -1,5 +1,44 @@
+# Python
 venv/
 backend/venv/
 __pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.eggs/
+
+# Ortam / gizli bilgiler
 .env
+.env.*
+!.env.example
+!**/.env.example
+
+# Veritabanı ve yüklenen belgeler (yerel)
+backend/local.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Node
+node_modules/
+frontend/node_modules/
+etherdocs-contracts/node_modules/
+dist/
+frontend/dist/
+
+# Hardhat / deploy çıktıları
+etherdocs-contracts/cache/
+etherdocs-contracts/artifacts/
+etherdocs-contracts/typechain-types/
+etherdocs-contracts/ignition/deployments/
+
+# Frontend — yerel kontrat adresleri (örnek dosyalar kalır)
+frontend/js/constants.js
+frontend/config/contracts.json
+frontend/.env
+
+# IDE / OS
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
