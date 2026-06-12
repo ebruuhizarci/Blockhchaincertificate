@@ -44,7 +44,9 @@ export function PendingApprovalsPanel({
     try {
       await updateDocumentStatus(docId, status);
       toast.success(
-        status === "approved" ? "Belge onaylandı" : "Belge reddedildi"
+        status === "approved"
+          ? "Belge onaylandı ve AES/RSA ile şifrelendi"
+          : "Belge reddedildi"
       );
       await load();
     } catch (e) {

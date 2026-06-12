@@ -2,6 +2,7 @@
 from pathlib import Path
 
 UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
+ENCRYPTED_DIR = UPLOAD_DIR / "encrypted"
 
 
 def upload_dir() -> Path:
@@ -64,12 +65,50 @@ def find_stored_file(
     return None
 
 
+def encrypted_path_for_doc(doc_id: int) -> Path:
+    ENCRYPTED_DIR.mkdir(parents=True, exist_ok=True)
+    return ENCRYPTED_DIR / f"doc_{doc_id}.aes"
+
+
+def write_encrypted_document(doc_id: int, ciphertext: bytes) -> Path:
+    path = encrypted_path_for_doc(doc_id)
+    path.write_bytes(ciphertext)
+    return path
+
+
+def read_encrypted_document(doc_id: int) -> bytes:
+    path = encrypted_path_for_doc(doc_id)
+    if not path.is_file():
+        raise FileNotFoundError(f"Şifreli dosya yok: {path}")
+    return path.read_bytes()
+
+
+def delete_plain_document_file(
+    doc_id: int,
+    filename: str | None = None,
+    file_hash: str | None = None,
+) -> None:
+    path = find_stored_file(doc_id, file_hash, filename)
+    if path and path.is_file():
+        try:
+            path.unlink()
+        except Exception:
+            pass
+
+
+def has_encrypted_file(doc_id: int) -> bool:
+    p = encrypted_path_for_doc(doc_id)
+    return p.is_file() and p.stat().st_size > 0
+
+
 def has_stored_file(
     doc_id: int,
     file_hash: str | None = None,
     filename: str | None = None,
 ) -> bool:
-    return find_stored_file(doc_id, file_hash, filename) is not None
+    return find_stored_file(doc_id, file_hash, filename) is not None or has_encrypted_file(
+        doc_id
+    )
 
 
 # Geriye uyumluluk

@@ -152,6 +152,79 @@ export async function fetchPendingInstitutionDocs(
   return Array.isArray(data) ? data : [];
 }
 
+export type PaymentConfig = {
+  amount_try: number;
+  currency: string;
+  iyzico_configured: boolean;
+  relayer_configured: boolean;
+  mock_mode: boolean;
+};
+
+export type PaymentInitResponse = {
+  session_id: string;
+  payment_page_url: string;
+  amount_try: number;
+  mock?: boolean;
+  error?: string;
+};
+
+export type PaymentSessionStatus = {
+  session_id: string;
+  status: string;
+  doc_id?: number | null;
+  blockchain_tx?: string | null;
+  file_hash?: string;
+  error?: string | null;
+  amount_try?: number;
+};
+
+export async function fetchPaymentConfig(): Promise<PaymentConfig> {
+  const { data, res } = await apiFetch<PaymentConfig & { error?: string }>(
+    "/payments/config"
+  );
+  if (!res.ok) {
+    throw new Error("Ödeme ayarları alınamadı");
+  }
+  return data;
+}
+
+export async function initIyzicoPayment(
+  file: File,
+  uploaderName: string,
+  targetInstitution: string,
+  userEmail: string
+): Promise<PaymentInitResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("uploader_name", uploaderName);
+  form.append("target_institution", targetInstitution);
+  form.append("user_email", userEmail);
+
+  const { data, res } = await apiFetch<PaymentInitResponse>("/payments/iyzico/init", {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok || data.error) {
+    throw new Error(data.error ?? "Ödeme başlatılamadı");
+  }
+  if (!data.payment_page_url) {
+    throw new Error("Ödeme sayfası oluşturulamadı");
+  }
+  return data;
+}
+
+export async function fetchPaymentSession(
+  sessionId: string
+): Promise<PaymentSessionStatus> {
+  const { data, res } = await apiFetch<PaymentSessionStatus & { error?: string }>(
+    `/payments/session/${encodeURIComponent(sessionId)}`
+  );
+  if (!res.ok) {
+    throw new Error(data.error ?? "Ödeme durumu alınamadı");
+  }
+  return data;
+}
+
 export async function updateDocumentStatus(
   docId: number,
   status: "approved" | "rejected",

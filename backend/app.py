@@ -1,6 +1,29 @@
-from flask import Flask, request, jsonify, send_file
+import os
+from pathlib import Path
+import secrets
+
+from io import BytesIO
+
+from flask import Flask, request, jsonify, send_file, redirect
 from flask_cors import CORS
 import hashlib
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent / ".env")
+except ImportError:
+    env_path = Path(__file__).resolve().parent / ".env"
+    if env_path.is_file():
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import (
     get_db_connection,
@@ -11,11 +34,22 @@ from database import (
     ensure_profiles_schema,
     insert_document,
     fetch_documents_for_user,
+    fetch_pending_documents_for_institution,
     get_or_create_student_uuid,
     institution_code_variants,
 )
 from errors import friendly_db_error as _friendly_db_error
 from file_storage import save_document_file, find_stored_file, has_stored_file
+from payment_config import (
+    FRONTEND_URL,
+    IYZICO_MOCK,
+    PAYMENT_AMOUNT_TRY,
+    iyzico_configured,
+    relayer_configured,
+)
+from payment_service import complete_payment, get_session_status, start_card_payment
+from document_encryption import decrypt_document_bytes, seal_document_on_approval
+from database import update_payment_session
 
 app = Flask(__name__)
 CORS(
@@ -183,6 +217,25 @@ def _user_row_to_dict(row):
     }
 
 
+_ADMIN_TOKENS: set[str] = set()
+
+
+def _admin_env() -> tuple[str, str]:
+    email = os.getenv("ADMIN_EMAIL", "admin@etherescan.local").strip().lower()
+    password = os.getenv("ADMIN_PASSWORD", "admin123").strip()
+    return email, password
+
+
+def _require_admin_token() -> tuple[bool, tuple]:
+    auth = (request.headers.get("Authorization") or "").strip()
+    if not auth.startswith("Bearer "):
+        return False, (jsonify({"error": "Admin yetkisi gerekli"}), 401)
+    token = auth.replace("Bearer ", "", 1).strip()
+    if not token or token not in _ADMIN_TOKENS:
+        return False, (jsonify({"error": "Admin oturumu geçersiz"}), 401)
+    return True, ()
+
+
 @app.route("/auth/register", methods=["POST"])
 def auth_register():
     data = request.json or {}
@@ -252,12 +305,14 @@ def auth_login():
         ensure_users_schema(conn)
         cur = conn.cursor()
         cur.execute(
-            _sql(conn, "SELECT id, email, full_name, password_hash FROM users WHERE email = %s"),
+            _sql(conn, "SELECT id, email, full_name, password_hash, is_banned FROM users WHERE email = %s"),
             (email,),
         )
         row = cur.fetchone()
         if not row or not check_password_hash(row[3], password):
             return jsonify({"error": "E-posta veya şifre hatalı"}), 401
+        if bool(row[4]):
+            return jsonify({"error": "Hesabınız askıya alınmış. Yöneticiyle iletişime geçin."}), 403
         get_or_create_student_uuid(conn, email, row[2])
         return jsonify({
             "message": "Giriş başarılı",
@@ -299,6 +354,112 @@ def auth_institution_login():
             "message": "Kurum girişi başarılı",
             "institution": {"id": row[0], "code": row[1], "name": row[2]},
         })
+    except Exception as e:
+        return jsonify({"error": _friendly_db_error(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+        conn.close()
+
+
+@app.route("/auth/admin/login", methods=["POST"])
+def auth_admin_login():
+    data = request.json or {}
+    email = (data.get("email") or "").strip().lower()
+    password = (data.get("password") or "").strip()
+    admin_email, admin_password = _admin_env()
+    if email != admin_email or password != admin_password:
+        return jsonify({"error": "Admin e-posta veya şifre hatalı"}), 401
+    token = secrets.token_urlsafe(32)
+    _ADMIN_TOKENS.add(token)
+    return jsonify({"message": "Admin giriş başarılı", "token": token})
+
+
+@app.route("/admin/users", methods=["GET"])
+def admin_list_users():
+    ok, response = _require_admin_token()
+    if not ok:
+        return response
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Veritabanı bağlantısı kurulamadı"}), 500
+    cur = None
+    try:
+        ensure_users_schema(conn)
+        cur = conn.cursor()
+        cur.execute(
+            _sql(
+                conn,
+                "SELECT id, email, full_name, is_banned, created_at FROM users ORDER BY id DESC",
+            )
+        )
+        out = []
+        for row in cur.fetchall():
+            out.append(
+                {
+                    "id": row[0],
+                    "email": row[1],
+                    "full_name": row[2],
+                    "is_banned": bool(row[3]),
+                    "created_at": str(row[4]) if row[4] else None,
+                }
+            )
+        return jsonify({"users": out})
+    except Exception as e:
+        return jsonify({"error": _friendly_db_error(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+        conn.close()
+
+
+@app.route("/admin/users/<int:user_id>/ban", methods=["POST"])
+def admin_ban_user(user_id: int):
+    ok, response = _require_admin_token()
+    if not ok:
+        return response
+    data = request.json or {}
+    banned = bool(data.get("banned"))
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Veritabanı bağlantısı kurulamadı"}), 500
+    cur = None
+    try:
+        ensure_users_schema(conn)
+        cur = conn.cursor()
+        cur.execute(
+            _sql(conn, "UPDATE users SET is_banned = %s WHERE id = %s"),
+            (1 if _is_sqlite(conn) and banned else 0 if _is_sqlite(conn) else banned, user_id),
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+        return jsonify({"message": "Kullanıcı durumu güncellendi", "is_banned": banned})
+    except Exception as e:
+        return jsonify({"error": _friendly_db_error(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+        conn.close()
+
+
+@app.route("/admin/users/<int:user_id>", methods=["DELETE"])
+def admin_delete_user(user_id: int):
+    ok, response = _require_admin_token()
+    if not ok:
+        return response
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "Veritabanı bağlantısı kurulamadı"}), 500
+    cur = None
+    try:
+        ensure_users_schema(conn)
+        cur = conn.cursor()
+        cur.execute(_sql(conn, "DELETE FROM users WHERE id = %s"), (user_id,))
+        conn.commit()
+        if cur.rowcount == 0:
+            return jsonify({"error": "Kullanıcı bulunamadı"}), 404
+        return jsonify({"message": "Kullanıcı silindi"})
     except Exception as e:
         return jsonify({"error": _friendly_db_error(e)}), 500
     finally:
@@ -404,56 +565,13 @@ def upload_file():
 def get_pending_docs(institution_name):
     conn = get_db_connection()
     if conn:
-        cur = None
         try:
-            ensure_documents_schema(conn)
-            cur = conn.cursor()
-            variants = institution_code_variants(institution_name)
-
-            if _is_sqlite(conn):
-                placeholders = ", ".join(["?"] * len(variants))
-                cur.execute(
-                    f"""
-                    SELECT id, filename,
-                           COALESCE(NULLIF(TRIM(uploader_name), ''), CAST(student_id AS TEXT)) AS uploader,
-                           created_at, file_hash
-                    FROM documents
-                    WHERE target_institution IN ({placeholders}) AND status = 'pending'
-                    """,
-                    tuple(variants),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT id, filename,
-                           COALESCE(
-                             NULLIF(TRIM(uploader_name), ''),
-                             (SELECT full_name FROM profiles p WHERE p.id = documents.student_id LIMIT 1),
-                             student_id::text
-                           ) AS uploader,
-                           created_at, file_hash
-                    FROM documents
-                    WHERE target_institution = ANY(%s) AND status = 'pending'
-                    """,
-                    (variants,),
-                )
-
-            docs = cur.fetchall()
-            output = []
-            for doc in docs:
-                output.append(_attach_file_flags({
-                    "id": doc[0],
-                    "filename": doc[1],
-                    "uploader": doc[2] or "Bilinmiyor",
-                    "date": str(doc[3]) if doc[3] else None,
-                    "file_hash": doc[4],
-                }))
+            docs = fetch_pending_documents_for_institution(conn, institution_name)
+            output = [_attach_file_flags(doc) for doc in docs]
             return jsonify(output)
         except Exception as e:
             return jsonify({"error": _friendly_db_error(e)}), 500
         finally:
-            if cur:
-                cur.close()
             conn.close()
     return jsonify({"error": "Sunucuya bağlanılamadı."}), 500
 
@@ -580,18 +698,32 @@ def serve_document_file(doc_id):
         if not allowed:
             return jsonify({"error": "Bu belgeyi görüntüleme yetkiniz yok"}), 403
 
-        stored = find_stored_file(doc_id, row[2], row[1])
-        if not stored:
-            return jsonify({
-                "error": "Dosya arşivde yok. Yalnızca hash kaydı mevcut; belgeyi tekrar yükleyin.",
-            }), 404
+        from document_encryption import document_encryption_meta
 
-        resp = send_file(
-            stored,
-            mimetype=_mimetype_for_filename(row[1]),
-            as_attachment=True,
-            download_name=row[1],
-        )
+        enc_meta = document_encryption_meta(conn, doc_id)
+        if enc_meta and enc_meta.get("is_encrypted"):
+            try:
+                content = decrypt_document_bytes(conn, doc_id)
+            except Exception as e:
+                return jsonify({"error": _friendly_db_error(e)}), 500
+            resp = send_file(
+                BytesIO(content),
+                mimetype=_mimetype_for_filename(row[1]),
+                as_attachment=True,
+                download_name=row[1],
+            )
+        else:
+            stored = find_stored_file(doc_id, row[2], row[1])
+            if not stored:
+                return jsonify({
+                    "error": "Dosya arşivde yok. Yalnızca hash kaydı mevcut; belgeyi tekrar yükleyin.",
+                }), 404
+            resp = send_file(
+                stored,
+                mimetype=_mimetype_for_filename(row[1]),
+                as_attachment=True,
+                download_name=row[1],
+            )
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Content-Disposition"] = f'inline; filename="{row[1]}"'
         return resp
@@ -624,10 +756,24 @@ def update_status():
                     conn,
                     "UPDATE documents SET status = %s, blockchain_tx_hash = %s WHERE id = %s",
                 ),
-                (new_status, tx_hash, doc_id)
+                (new_status, tx_hash, doc_id),
             )
             conn.commit()
-            return jsonify({"message": f"Belge durumu {new_status} olarak güncellendi."})
+
+            encryption_note = ""
+            if new_status == "approved":
+                try:
+                    seal_document_on_approval(conn, doc_id)
+                    encryption_note = " Belge AES ile şifrelendi; anahtar kurum RSA anahtarı ile korundu."
+                except Exception as enc_err:
+                    return jsonify({
+                        "error": f"Onay kaydedildi ancak şifreleme başarısız: {enc_err}",
+                    }), 500
+
+            return jsonify({
+                "message": f"Belge durumu {new_status} olarak güncellendi.{encryption_note}",
+                "encrypted": new_status == "approved",
+            })
         except Exception as e:
             return jsonify({"error": _friendly_db_error(e)}), 500
         finally:
@@ -668,6 +814,130 @@ def verify_doc(hash_val):
                 cur.close()
             conn.close()
     return jsonify({"error": "Sunucuya bağlanılamadı."}), 500
+
+
+# --- ÖDEME: iyzico + relayer ---
+@app.route("/payments/config", methods=["GET"])
+def payments_config():
+    return jsonify({
+        "amount_try": float(PAYMENT_AMOUNT_TRY),
+        "currency": "TRY",
+        "iyzico_configured": iyzico_configured(),
+        "relayer_configured": relayer_configured(),
+        "mock_mode": IYZICO_MOCK,
+    })
+
+
+@app.route("/payments/iyzico/init", methods=["POST"])
+def payments_iyzico_init():
+    if "file" not in request.files:
+        return jsonify({"error": "Dosya seçilmedi"}), 400
+
+    file = request.files["file"]
+    uploader_name = (request.form.get("uploader_name") or "").strip()
+    user_email = (request.form.get("user_email") or "").strip().lower()
+    target_institution = request.form.get("target_institution", "BEUN")
+
+    if not user_email:
+        return jsonify({"error": "Giriş yapmanız ve e-posta gönderilmesi gerekir"}), 400
+    if not uploader_name:
+        return jsonify({"error": "Ad soyad gerekli"}), 400
+    if not file.filename:
+        return jsonify({"error": "Dosya adı boş"}), 400
+
+    content = file.read()
+    file_hash = hashlib.sha256(content).hexdigest()
+    buyer_ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "127.0.0.1").split(",")[0].strip()
+
+    result = start_card_payment(
+        file_content=content,
+        filename=file.filename,
+        file_hash=file_hash,
+        uploader_name=uploader_name,
+        target_institution=target_institution,
+        user_email=user_email,
+        buyer_ip=buyer_ip,
+    )
+
+    if result.get("error"):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+@app.route("/payments/iyzico/callback", methods=["POST"])
+def payments_iyzico_callback():
+    token = (request.form.get("token") or "").strip()
+    if not token:
+        return redirect(f"{FRONTEND_URL}/odeme/sonuc?status=error&reason=token_missing")
+
+    conn = get_db_connection()
+    session_id = None
+    if conn:
+        try:
+            cur = conn.cursor()
+            is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+            ph = "?" if is_sqlite else "%s"
+            cur.execute(
+                f"SELECT id FROM payment_sessions WHERE iyzico_token = {ph}",
+                (token,),
+            )
+            row = cur.fetchone()
+            cur.close()
+            if row:
+                session_id = row[0]
+        finally:
+            conn.close()
+
+    if not session_id:
+        return redirect(f"{FRONTEND_URL}/odeme/sonuc?status=error&reason=session_not_found")
+
+    result = complete_payment(session_id, token)
+    if result.get("ok"):
+        return redirect(f"{FRONTEND_URL}/odeme/sonuc?session={session_id}&status=success")
+    return redirect(
+        f"{FRONTEND_URL}/odeme/sonuc?session={session_id}&status=error"
+        f"&reason={result.get('error', 'payment_failed')}"
+    )
+
+
+@app.route("/payments/iyzico/mock-complete", methods=["GET"])
+def payments_iyzico_mock_complete():
+    session_id = (request.args.get("session") or "").strip()
+    token = (request.args.get("token") or "").strip()
+    if not session_id or not IYZICO_MOCK:
+        return jsonify({"error": "Geçersiz mock ödeme"}), 400
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            update_payment_session(conn, session_id, iyzico_token=token)
+        finally:
+            conn.close()
+
+    result = complete_payment(session_id, token, mock=True)
+    if result.get("ok"):
+        return redirect(f"{FRONTEND_URL}/odeme/sonuc?session={session_id}&status=success")
+    return redirect(
+        f"{FRONTEND_URL}/odeme/sonuc?session={session_id}&status=error"
+        f"&reason={result.get('error', '')}"
+    )
+
+
+@app.route("/payments/session/<session_id>", methods=["GET"])
+def payments_session_status(session_id):
+    session = get_session_status(session_id)
+    if not session:
+        return jsonify({"error": "Oturum bulunamadı"}), 404
+    return jsonify({
+        "session_id": session["id"],
+        "status": session["status"],
+        "doc_id": session.get("doc_id"),
+        "blockchain_tx": session.get("blockchain_tx_hash"),
+        "file_hash": session.get("file_hash"),
+        "error": session.get("error_message"),
+        "amount_try": session.get("amount_try"),
+    })
+
 
 if __name__ == "__main__":
     app.run(debug=True)

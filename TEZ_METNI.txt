@@ -1,0 +1,410 @@
+================================================================================
+KABUL
+================================================================================
+
+XXXXX SEZER ve XXXXX YARDIMCI tarafından hazırlanan BLOCKCHAIN TABANLI DİJİTAL BELGE NOTER SİSTEMİ: ETHERESCAN başlıklı bu çalışma jürimiz tarafından değerlendirilerek, Bülent Ecevit Üniversitesi, Mühendislik Fakültesi Bilgisayar Mühendisliği Bölümü Diploma Çalışması olarak oybirliğiyle kabul edilmiştir.
+
+XX/XX/2026
+
+Danışman: Unvan Adı SOYADI
+Zonguldak Bülent Ecevit Üniversitesi, Bilgisayar Müh. Bölümü
+
+Üye: Unvan Adı SOYADI
+Zonguldak Bülent Ecevit Üniversitesi, Bilgisayar Müh. Bölümü
+
+Üye: Unvan Adı SOYADI
+Zonguldak Bülent Ecevit Üniversitesi, Bilgisayar Müh. Bölümü
+
+
+ONAY
+
+Yukarıdaki imzaların, adı geçen öğretim üyelerine ait olduğunu onaylarım.
+
+XX/XX/2026
+
+Dr. Öğr. Ad SOYADI
+Bilgisayar Mühendisliği Bölüm Başkanı
+
+
+================================================================================
+BEYAN
+================================================================================
+
+Bu çalışmadaki tüm bilgilerin akademik kurallara ve etik ilkelere uygun olarak elde edildiğini ve sunulduğunu; ayrıca bu kuralların ve ilkelerin gerektirdiği şekilde, bu çalışmadan kaynaklanmayan bütün atıfları yaptığımı beyan ederim.
+
+Ad SOYAD                    Ad SOYAD                    Ad SOYAD
+1601061090XX                1601061090XX                1601061090XX
+
+
+================================================================================
+ÖZET
+================================================================================
+
+DİPLOMA ÇALIŞMASI
+
+BLOCKCHAIN TABANLI DİJİTAL BELGE NOTER SİSTEMİ: ETHERESCAN
+
+Ad SOYAD                    Ad SOYAD                    Ad SOYAD
+
+Zonguldak Bülent Ecevit Üniversitesi
+Mühendislik Fakültesi
+Bilgisayar Mühendisliği Bölümü
+Diploma Çalışması Danışmanı: Doç. Dr. Ad SOYADI
+Haziran 2026, XX Sayfa
+
+Dijital belgelerin sahteciliğe açık olması, kurumlar ve bireyler için güvenilir doğrulama ihtiyacını artırmaktadır. Bu çalışmada, PDF belgelerinin bütünlüğünü ve kayıt zamanını kanıtlayan, kurum onay sürecini dijitalleştiren Etherescan adlı web tabanlı bir sistem geliştirilmiştir.
+
+Belge içeriği istemci tarafında SHA-256 algoritması ile özetlenmiş, elde edilen hash değeri Polygon Amoy test ağı üzerindeki akıllı kontrata yazılmıştır. Sistem React tabanlı frontend, Flask backend ve PostgreSQL veritabanı ile geliştirilmiştir. Kullanıcılar belge mühürlemeyi MetaMask cüzdanı veya iyzico ödeme altyapısı üzerinden gerçekleştirebilmektedir. Kartlı ödemede belge başına sabit ücret alınmakta ve blockchain işlemi sunucu tarafındaki relayer cüzdanı ile yürütülmektedir.
+
+Yüklenen belgeler hedef kuruma onaya gönderilmektedir. Kurum onayı öncesinde belge geçici olarak düz biçimde arşivlenmekte, onay sonrasında AES-256-GCM ile şifrelenmektedir. Simetrik anahtar, ilgili kurumun RSA-OAEP public anahtarı ile korunarak veritabanında saklanmaktadır. Kurum paneli üzerinden onay ve red işlemleri yapılmakta, kullanıcılar kendi belgelerini listeleyip indirebilmektedir. Admin modülü ile kullanıcı yönetimi sağlanmaktadır.
+
+Test senaryolarında hash hesaplama, blockchain kaydı, kurumsal onay, onay sonrası şifreleme, belge indirme ve doğrulama işlemleri başarıyla gerçekleştirilmiştir. Geliştirilen sistem, belge bütünlüğünü blockchain üzerinde kanıtlarken onaylanmış belgelerin gizliliğini hibrit şifreleme yöntemi ile desteklemektedir. Sonuç olarak Etherescan, akademik ve kurumsal belgeler için düşük maliyetli, şeffaf ve denetlenebilir bir dijital noter yaklaşımı sunmaktadır.
+
+Anahtar Kelimeler: Blockchain, SHA-256, AES, RSA, dijital belge doğrulama, akıllı kontrat
+
+
+================================================================================
+ABSTRACT
+================================================================================
+
+B.Sc. PROJECT
+
+A BLOCKCHAIN-BASED DIGITAL DOCUMENT NOTARY SYSTEM: ETHERESCAN
+
+Name SURNAME                  Name SURNAME                  Name SURNAME
+
+Zonguldak Bülent Ecevit University
+Faculty of Engineering
+Department of Computer Engineering
+Graduation Project Advisor: Asst. Prof. Name SURNAME
+June 2026, XX Page
+
+Digital documents are vulnerable to forgery and unauthorized modification, which increases the need for reliable verification mechanisms. In this graduation project, Etherescan, a web-based system that proves document integrity and registration time while digitizing institutional approval workflows, has been developed.
+
+Document content is hashed on the client side using the SHA-256 algorithm, and the resulting digest is stored on the Polygon Amoy test network through a smart contract. The system is implemented using a React frontend, Flask backend, and PostgreSQL database. Users can seal documents through MetaMask wallet integration or iyzico payment infrastructure. In card-based payment, a fixed fee is charged per document and the blockchain transaction is performed by a backend relayer wallet.
+
+Uploaded documents are sent to target institutions for approval. Before approval, files are temporarily stored in plain form. After approval, document content is encrypted with AES-256-GCM, and the symmetric key is protected using the institution RSA-OAEP public key and stored in the database. Institutions can approve or reject documents through a dedicated panel. Users can list and download their records. An admin module provides user management functions.
+
+Test scenarios confirmed successful hash registration, blockchain recording, institutional approval, post-approval encryption, document download, and verification processes. The developed system proves document integrity on blockchain while supporting confidentiality of approved documents through hybrid encryption. As a result, Etherescan offers a low-cost, transparent, and auditable digital notary approach for academic and institutional documents.
+
+Keywords: Blockchain, SHA-256, AES, RSA, digital document verification, smart contract
+
+
+================================================================================
+TEŞEKKÜR
+================================================================================
+
+Bu diploma çalışmasının hazırlanması sürecinde değerli bilgi ve yönlendirmeleriyle bize destek olan danışman hocamız Doç. Dr. Ad SOYADI'na teşekkür ederiz.
+
+Proje sürecinde teknik altyapı, blockchain entegrasyonu ve yazılım geliştirme konularında yardımlarını esirgemeyen değerli kişilere; test senaryolarında destek olan arkadaşlarımıza; ayrıca Zonguldak Bülent Ecevit Üniversitesi Bilgisayar Mühendisliği Bölümü'ne teşekkür ederiz.
+
+Son olarak, eğitim hayatımız boyunca maddi ve manevi desteklerini hiç eksik etmeyen ailelerimize en içten şükranlarımızı sunarız.
+
+
+================================================================================
+İÇİNDEKİLER
+================================================================================
+
+Sayfa
+
+KABUL                                                     ii
+ÖZET                                                      iii
+ABSTRACT                                                  v
+TEŞEKKÜR                                                  vii
+İÇİNDEKİLER                                               ix
+ŞEKİLLER DİZİNİ                                           xi
+ÇİZELGELER DİZİNİ                                         xiii
+SİMGELER VE KISALTMALAR DİZİNİ                            xv
+BÖLÜM 1 GİRİŞ                                             1
+  1.1 Literatür Taraması                                  2
+  1.2 Projenin Hedefleri ve Önemi                         3
+  1.3 Tasarım Kısıtları ve Koşulları                      4
+BÖLÜM 2 MATERYAL VE YÖNTEM                                5
+  2.1 Proje Materyal Tanımları ve Seçimi                  7
+  2.2 Sistem Mimarisi ve İş Akışı                          9
+  2.3 Kriptografik Yöntemler                              12
+  2.4 Veritabanı Tasarımı                                 14
+  2.5 Akıllı Kontrat Tasarımı                             15
+BÖLÜM 3 DEĞERLENDİRME VE ÖNERİLER                         17
+  3.1 Sonuçlar ve Değerlendirme                           17
+  3.2 Öneriler                                            19
+BÖLÜM 4 PROJE ANALİZİ                                    21
+  4.1 Ekonomik, Sürdürülebilirlik ve Üretilebilirlik Analizi   21
+  4.2 Etik, Sağlık ve Güvenlik Analizi                     22
+  4.3 Sosyal Analiz                                       23
+  4.4 Projenin Evrensel ve Toplumsal Boyutlarda Sağlık, Çevre ve Güvenlik Üzerindeki Etkileri   24
+  4.5 Projenin Sunduğu Mühendislik Çözümünün Hukuki Açıdan Değerlendirilmesi   25
+KAYNAKLAR                                                 27
+EKLER                                                     29
+  EK.A Proje Sunumu                                       30
+  EK.B Proje Yazılım Kodları                              31
+ÖZGEÇMİŞ                                                  33
+
+
+================================================================================
+SİMGELER VE KISALTMALAR DİZİNİ
+================================================================================
+
+KISALTMALAR
+
+AES     Advanced Encryption Standard
+API     Application Programming Interface
+BEÜN    Bülent Ecevit Üniversitesi
+DB      Veritabanı
+GCM     Galois Counter Mode
+HTTP    Hypertext Transfer Protocol
+JSON    JavaScript Object Notation
+KVKK    Kişisel Verilerin Korunması Kanunu
+PDF     Portable Document Format
+RSA     Rivest Shamir Adleman
+RPC     Remote Procedure Call
+SHA     Secure Hash Algorithm
+SQL     Structured Query Language
+TX      Transaction
+UI      User Interface
+UUID    Universally Unique Identifier
+Web3    Merkeziyetsiz web teknolojileri
+
+
+================================================================================
+BÖLÜM 1
+GİRİŞ
+================================================================================
+
+1.1 Literatür Taraması
+
+Dijital belge yönetimi, geleneksel kağıt tabanlı süreçlere göre hız, erişilebilirlik ve maliyet avantajı sağlamaktadır. Ancak dijital ortamda belgelerin kolayca kopyalanabilmesi ve değiştirilebilmesi, güvenilirlik sorununu gündeme getirmektedir. Bu soruna yönelik iki temel yaklaşım öne çıkmaktadır: bütünlük doğrulama ve gizlilik.
+
+Hash tabanlı yöntemlerde belge içeriğinden tek yönlü bir özet üretilir. SHA-256 gibi algoritmalar, küçük bir değişiklikte bile tamamen farklı özet üreterek belge bütünlüğünün kontrol edilmesini sağlar. Blockchain teknolojisi ise bu özetin değiştirilemez bir deftere zaman damgalı olarak yazılmasına olanak tanır. Literatürde e-Devlet, akademik diploma ve sağlık kayıtları gibi alanlarda blockchain destekli doğrulama sistemleri incelenmektedir.
+
+Simetrik şifreleme ve asimetrik şifreleme belge gizliliği için kullanılır. AES yüksek hacimli verilerin hızlı şifrelenmesi için uygundur. RSA anahtar dağıtımında tercih edilir. Hibrit modellerde dosya AES ile şifrelenir, AES anahtarı RSA ile korunur.
+
+Mevcut çalışmaların bir kısmı yalnızca blockchain kaydı üzerine odaklanırken, bir kısmı merkezi sunucu tabanlı arşivleme kullanmaktadır. Etherescan, hash kaydını blockchain üzerinde, metadata ve şifreli arşivi ise backend katmanında yöneten hibrit bir yaklaşım sunmaktadır.
+
+
+1.2 Projenin Hedefleri ve Önemi
+
+Projenin temel hedefleri aşağıdaki gibidir:
+
+PDF belgelerinin SHA-256 ile özetlenmesi ve blockchain ağına kaydedilmesi,
+Kurumsal onay sürecinin web arayüzü üzerinden yönetilmesi,
+Onay sonrası AES ve RSA tabanlı hibrit şifreleme ile belge gizliliğinin sağlanması,
+Kullanıcı dostu arayüz ile belge doğrulama imkanının sunulması,
+Cüzdan ve kredi kartı ile alternatif ödeme ve mühürleme yollarının desteklenmesi.
+
+Projenin önemi, sahte belge riskinin azaltılması, kurumlar için dijital onay sürecinin hızlanması ve bireyler için belge sahipliğinin doğrulanabilir hale gelmesi açısından değerlidir. Üniversite belgeleri, staj belgeleri ve kurumsal sertifikalar gibi senaryolara uygulanabilir niteliktedir.
+
+
+1.3 Tasarım Kısıtları ve Koşulları
+
+Geliştirme sürecinde aşağıdaki kısıtlar dikkate alınmıştır:
+
+Test ağı olarak Polygon Amoy kullanılmıştır.
+Desteklenen belge formatı PDF olarak sınırlandırılmıştır.
+Kurum RSA private anahtarları demo ortamında sunucuda saklanmaktadır.
+Ödeme testleri iyzico sandbox ortamında gerçekleştirilmiştir.
+Kişisel veriler KVKK kapsamında minimum düzeyde tutulmaktadır.
+
+
+================================================================================
+BÖLÜM 2
+MATERYAL VE YÖNTEM
+================================================================================
+
+2.1 Proje Materyal Tanımları ve Seçimi
+
+2.1.1 Yazılım Bileşenleri
+
+Frontend katmanında React, Vite ve TypeScript kullanılmıştır. Kullanıcı arayüzü, hash hesaplama ve cüzdan bağlantısı bu katmanda gerçekleştirilmiştir.
+
+Backend katmanında Python Flask framework tercih edilmiştir. REST API, dosya arşivi, ödeme işlemleri ve şifreleme bu katmanda yürütülmüştür.
+
+Veritabanı olarak PostgreSQL ve Supabase kullanılmıştır. Yerel geliştirmede SQLite yedek seçeneği bulunmaktadır.
+
+Blockchain katmanında Solidity dili ile akıllı kontrat geliştirilmiş, Hardhat aracı ile deploy edilmiştir. Ağ olarak Polygon Amoy test ağı seçilmiştir.
+
+Ödeme altyapısı için iyzico Checkout API entegre edilmiştir. Belge başına sabit 50 TL ücret uygulanmaktadır.
+
+Kriptografik işlemler için SHA-256, AES-256-GCM ve RSA-OAEP algoritmaları kullanılmıştır.
+
+
+2.1.2 Donanım ve Geliştirme Ortamı
+
+Geliştirme ortamı Windows 10 veya 11 işletim sistemi üzerinde Visual Studio Code editörü ile sağlanmıştır. Backend yerel olarak 127.0.0.1:5000 adresinde, frontend 5173 portunda çalıştırılmıştır. Web3 işlemleri için MetaMask cüzdan eklentisi kullanılmıştır.
+
+
+2.2 Sistem Mimarisi ve İş Akışı
+
+2.2.1 Kullanıcı Belge Yükleme Akışı
+
+Kullanıcı sisteme üye olur veya giriş yapar. PDF dosyası seçilir ve tarayıcıda SHA-256 hash değeri hesaplanır. Ödeme yöntemi olarak cüzdan veya kredi kartı seçilir.
+
+Cüzdan yolunda kullanıcı MetaMask ile addCertificate işlemini imzalar. Kart yolunda iyzico ödemesi tamamlandıktan sonra relayer cüzdanı hash değerini zincire yazar.
+
+Backend tarafında belge metadata bilgileri veritabanına pending durumu ile kaydedilir. PDF dosyası geçici olarak düz biçimde arşivlenir.
+
+
+2.2.2 Kurum Onay Akışı
+
+Kurum yetkilisi kurum kodu ve şifresi ile giriş yapar. Onay bekleyen belgeler listelenir. Kurum belgeyi indirerek inceler.
+
+Onay işleminde belge durumu approved olarak güncellenir. PDF dosyası AES-256-GCM ile şifrelenir. Simetrik anahtar kurum RSA public anahtarı ile korunarak veritabanına yazılır. Düz PDF dosyası silinir.
+
+Red işleminde belge durumu rejected olarak güncellenir. Şifreleme uygulanmaz.
+
+
+2.2.3 Doğrulama Akışı
+
+Kullanıcı hash değeri veya PDF dosyası ile sorgulama yapar. Sistem blockchain üzerinde hash kaydını kontrol eder. Veritabanından kurum bilgisi, dosya adı ve onay durumu döndürülür.
+
+
+2.3 Kriptografik Yöntemler
+
+SHA-256 algoritması belge bütünlüğü için kullanılmıştır. Blockchain ağına yalnızca hash değeri yazılarak depolama maliyeti düşürülmüştür.
+
+AES-256-GCM algoritması onay sonrası belge gizliliği için kullanılmıştır. GCM modu hem gizlilik hem bütünlük sağlar.
+
+RSA-OAEP algoritması AES anahtarının kurum public anahtarı ile korunması için kullanılmıştır. İndirme sırasında private anahtar ile anahtar açılır ve belge çözülür.
+
+Kullanıcı giriş parolaları veritabanında hash formatında saklanır. Bu işlem belge şifrelemesinden ayrıdır.
+
+
+2.4 Veritabanı Tasarımı
+
+users tablosu kullanıcı kimlik bilgilerini ve ban durumunu tutar.
+
+documents tablosu belge metadata bilgilerini, hash değerini, onay durumunu, blockchain işlem hash değerini ve şifreleme alanlarını tutar.
+
+institutions tablosu kurum bilgilerini ve RSA anahtar çiftini tutar.
+
+payment_sessions tablosu iyzico ödeme oturumlarını tutar.
+
+
+2.5 Akıllı Kontrat Tasarımı
+
+EthdocsRegistry akıllı kontratı geliştirilmiştir. addCertificate fonksiyonu hash değerini zincire yazar. verifyCertificate fonksiyonu hash kaydının varlığını doğrular.
+
+
+================================================================================
+BÖLÜM 3
+DEĞERLENDİRME VE ÖNERİLER
+================================================================================
+
+3.1 Sonuçlar ve Değerlendirme
+
+Geliştirilen Etherescan sistemi hedeflenen temel işlevleri yerine getirmiştir.
+
+PDF hash hesaplama ve blockchain kaydı başarıyla gerçekleştirilmiştir.
+Kurum onay paneli ile pending, approved ve rejected durum yönetimi sağlanmıştır.
+Onay sonrası AES ve RSA tabanlı şifreleme uygulanmıştır.
+iyzico sandbox ortamında kartlı ödeme akışı test edilmiştir.
+MetaMask ile Web3 mühürleme alternatifi sunulmuştur.
+Admin paneli ile kullanıcı ban ve silme işlemleri yapılabilmiştir.
+
+Sistemin güçlü yönleri hash ve blockchain ile sağlanan bütünlük kanıtı, hibrit ödeme seçenekleri ve kurum onayı sonrası şifreleme modelidir.
+
+Sınırlılıklar test ağ kullanımı, demo ortamında private anahtar saklama yaklaşımı ve yalnızca PDF format desteğidir.
+
+
+3.2 Öneriler
+
+Polygon mainnet geçişi ve gas maliyeti optimizasyonu yapılabilir.
+Kurum private anahtarları HSM veya donanım güvenlik modülünde saklanabilir.
+IPFS tabanlı dağıtık dosya depolama entegre edilebilir.
+e-Devlet ve e-imza sistemleri ile entegrasyon değerlendirilebilir.
+Mobil uygulama ve QR kod ile doğrulama eklenebilir.
+Çoklu imza tabanlı kurum onayı geliştirilebilir.
+KVKK uyum denetimi ve veri saklama politikası oluşturulabilir.
+
+
+================================================================================
+BÖLÜM 4
+PROJE ANALİZİ
+================================================================================
+
+4.1 Ekonomik, Sürdürülebilirlik ve Üretilebilirlik Analizi
+
+Ekonomik açıdan proje açık kaynak teknolojiler kullanıldığı için lisans maliyeti düşüktür. İşletme maliyeti sunucu, veritabanı, blockchain gas ücreti ve ödeme komisyonlarından oluşmaktadır. Kullanıcıdan alınan 50 TL belge ücreti işletme maliyetlerini dengelemeyi hedeflemektedir. Kağıt, noter ve kargo maliyetlerine kıyasla uzun vadede avantaj sağlayabilir.
+
+Sürdürülebilirlik açısından dijital süreç kağıt tüketimini azaltır. Polygon gibi proof of stake tabanlı ağlar enerji verimliliği sağlar. Şifreli arşivleme veri minimizasyonuna katkı sunar.
+
+Üretilebilirlik açısından modüler mimari yeni kurum eklemeyi kolaylaştırır. Docker ile container tabanlı dağıtım mümkündür.
+
+
+4.2 Etik, Sağlık ve Güvenlik Analizi
+
+Etik açıdan IEEE etik kurallarına uygun şeffaf kayıt hedeflenmiştir. Kullanıcı onayı olmadan belge işlenmemektedir. Admin yetkisinin kötüye kullanım riski loglama ile azaltılabilir.
+
+Sağlık açıdan doğrudan tıbbi veri işlenmemektedir. Sağlık belgesi senaryosunda ek mevzuat uyumu gerekir.
+
+Güvenlik açıdan HTTPS kullanımı, API anahtarlarının ortam değişkenlerinde saklanması, parametreli SQL sorguları ve ban mekanizması uygulanmıştır.
+
+
+4.3 Sosyal Analiz
+
+Sistem üniversite öğrenci ve personel belgelerinde güven artışı sağlayabilir. Kurumlar arası dijital güven köprüsü oluşturur. Dijital okuryazarlık gerektirir. İnternet erişimi sınırlı bölgelerde dezavantaj oluşturabilir.
+
+
+4.4 Projenin Evrensel ve Toplumsal Boyutlarda Sağlık, Çevre ve Güvenlik Üzerindeki Etkileri
+
+Çevre boyutunda kağıt tüketimi ve fiziksel arşiv ihtiyacı azalır. Güvenlik boyutunda sahte diploma ve sahte sertifika riskinin azaltılması toplumsal adalete katkı sağlar. Sağlık boyutunda dolaylı etki vardır; sahte sağlık raporu engeline katkı potansiyeli bulunmaktadır.
+
+
+4.5 Projenin Sunduğu Mühendislik Çözümünün Hukuki Açıdan Değerlendirilmesi
+
+KVKK kapsamında e-posta, ad soyad ve belge metadata bilgileri kişisel veridir. Aydınlatma metni gereklidir. 5070 sayılı Elektronik İmza Kanunu kapsamında e-imza ile aynı hukuki statüde değildir. Sistem bütünlük kanıtı olarak konumlandırılmalıdır. iyzico lisanslı ödeme sağlayıcısı üzerinden çalışmaktadır. Hash, onay ve şifreleme pipeline için faydalı model başvurusu değerlendirilebilir.
+
+
+================================================================================
+KAYNAKLAR
+================================================================================
+
+[1] NIST, Secure Hash Standard, FIPS PUB 180-4, 2015.
+
+[2] NIST, Advanced Encryption Standard, FIPS PUB 197, 2001.
+
+[3] R. L. Rivest, A. Shamir, and L. Adleman, A Method for Obtaining Digital Signatures and Public-Key Cryptosystems, Communications of the ACM, 1978.
+
+[4] Ethereum Foundation, Ethereum Development Documentation, https://ethereum.org/en/developers/docs/
+
+[5] Polygon Technology, Polygon Amoy Testnet Documentation, https://docs.polygon.technology/
+
+[6] iyzico, iyzico API Documentation, https://dev.iyzipay.com/
+
+[7] Flask Project, Flask Documentation, https://flask.palletsprojects.com/
+
+[8] React Team, React Documentation, https://react.dev/
+
+[9] Kişisel Verileri Koruma Kurumu, 6698 Sayılı Kişisel Verilerin Korunması Kanunu, Resmi Gazete, 2016.
+
+[10] T.C. Cumhurbaşkanlığı, 5070 Sayılı Elektronik İmza Kanunu, 2004.
+
+
+================================================================================
+EKLER
+================================================================================
+
+EK A. Proje Sunumu
+
+Sistem mimarisi diyagramı, kullanıcı ve kurum arayüz ekran görüntüleri, blockchain işlem örneği, onay ve şifreleme akış şemaları bu eke eklenir.
+
+
+EK B. Proje Yazılım Kodları
+
+frontend klasörü React bileşenleri,
+backend klasörü Flask API ve şifreleme modülleri,
+etherdocs-contracts klasörü Solidity kontrat ve deploy scriptleri bu eke eklenir.
+
+
+================================================================================
+ÖZGEÇMİŞ
+================================================================================
+
+Ad SOYAD
+1999 yılında doğdu. İlköğretim ve ortaöğretim eğitimini tamamladı. Lise eğitimini bitirdikten sonra Zonguldak Bülent Ecevit Üniversitesi Bilgisayar Mühendisliği bölümünde lisans eğitimine başladı. Blockchain tabanlı dijital belge noter sistemi üzerine diploma çalışması yürütmektedir.
+
+Ad SOYAD
+1999 yılında doğdu. İlköğretim ve ortaöğretim eğitimini tamamladı. Lise eğitimini bitirdikten sonra Zonguldak Bülent Ecevit Üniversitesi Bilgisayar Mühendisliği bölümünde lisans eğitimine başladı. Blockchain tabanlı dijital belge noter sistemi üzerine diploma çalışması yürütmektedir.
+
+Ad SOYAD
+1999 yılında doğdu. İlköğretim ve ortaöğretim eğitimini tamamladı. Lise eğitimini bitirdikten sonra Zonguldak Bülent Ecevit Üniversitesi Bilgisayar Mühendisliği bölümünde lisans eğitimine başladı. Blockchain tabanlı dijital belge noter sistemi üzerine diploma çalışması yürütmektedir.

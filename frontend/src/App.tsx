@@ -8,6 +8,9 @@ import { AppDashboard } from "@/pages/AppDashboard";
 import { InstitutionLoginPage } from "@/pages/InstitutionLoginPage";
 import { MyDocumentsPage } from "@/pages/MyDocumentsPage";
 import { InstitutionDashboard } from "@/pages/InstitutionDashboard";
+import { PaymentResultPage } from "@/pages/PaymentResultPage";
+import { AdminLoginPage } from "@/pages/AdminLoginPage";
+import { AdminPanelPage } from "@/pages/AdminPanelPage";
 
 export default function App() {
   return (
@@ -16,6 +19,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/giris" element={<LoginPage />} />
+          <Route path="/admin/giris" element={<AdminLoginPage />} />
+          <Route path="/admin/panel" element={<AdminPanelPage />} />
           <Route path="/uye-ol" element={<RegisterPage />} />
           <Route
             path="/uygulama"
@@ -30,6 +35,14 @@ export default function App() {
             element={
               <SessionRouteGuard blockInstitution requireUser>
                 <MyDocumentsPage />
+              </SessionRouteGuard>
+            }
+          />
+          <Route
+            path="/odeme/sonuc"
+            element={
+              <SessionRouteGuard blockInstitution requireUser>
+                <PaymentResultPage />
               </SessionRouteGuard>
             }
           />
