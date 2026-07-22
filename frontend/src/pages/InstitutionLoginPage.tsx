@@ -3,13 +3,14 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { PageShell } from "@/components/layout/PageShell";
 import { InstitutionIcon } from "@/components/icons/InstitutionIcon";
-import { INSTITUTION_OPTIONS } from "@/config/institutions";
+import { useInstitutionOptions } from "@/hooks/useInstitutionOptions";
 import { useInstitution, useSession } from "@/context/SessionContext";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function InstitutionLoginPage() {
   const { mode, user } = useSession();
   const { institution, login } = useInstitution();
+  const { options: institutionOptions } = useInstitutionOptions();
   const navigate = useNavigate();
   const [code, setCode] = useState("BEUN");
   const [password, setPassword] = useState("");
@@ -57,7 +58,7 @@ export function InstitutionLoginPage() {
               onChange={(e) => setCode(e.target.value)}
               className="ether-input"
             >
-              {INSTITUTION_OPTIONS.map((o) => (
+              {institutionOptions.map((o) => (
                 <option key={o.code} value={o.code}>
                   {o.label}
                 </option>
@@ -81,9 +82,8 @@ export function InstitutionLoginPage() {
             )}
           </form>
           <p className="mt-4 rounded-2xl bg-slate-900/80 px-3 py-2 text-xs text-slate-500">
-            Demo: BEUN <strong className="text-slate-300">beun123</strong> · Sağlık{" "}
-            <strong className="text-slate-300">saglik123</strong> · Özel{" "}
-            <strong className="text-slate-300">ozel123</strong>
+            Kurum şifresi admin panelden oluşturulur. Demo: BEUN{" "}
+            <strong className="text-slate-300">beun123</strong>
           </p>
           <p className="mt-4 text-center text-sm text-slate-400">
             <Link to="/giris" className="font-bold text-indigo-400 hover:underline">

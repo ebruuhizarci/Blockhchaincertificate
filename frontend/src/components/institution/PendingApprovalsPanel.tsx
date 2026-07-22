@@ -98,6 +98,7 @@ export function PendingApprovalsPanel({
                   <p className="font-bold text-white">{doc.filename}</p>
                   <p className="mt-1 text-sm text-slate-400">
                     Yükleyen: <strong className="text-slate-200">{doc.uploader}</strong>
+                    {doc.academic_year ? ` · ${doc.academic_year}` : ""}
                     {doc.date ? ` · ${doc.date}` : ""}
                   </p>
                 </div>
@@ -108,6 +109,55 @@ export function PendingApprovalsPanel({
               <p className="mt-2 break-all font-mono text-[11px] text-slate-500">
                 {doc.file_hash}
               </p>
+
+              <div
+                className={`mt-4 rounded-xl border p-4 ${
+                  doc.hashes_equal || doc.registry_match
+                    ? "border-emerald-500/40 bg-emerald-500/10"
+                    : "border-slate-600/50 bg-slate-900/60"
+                }`}
+              >
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                  Hash karşılaştırması
+                </p>
+                <div className="mt-3 space-y-2 text-xs">
+                  <div>
+                    <p className="text-slate-400">Öğrenci belgesi hash</p>
+                    <p className="break-all font-mono text-slate-200">
+                      {doc.student_hash ?? doc.file_hash}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">Resmi kayıt defteri hash</p>
+                    {doc.registry_hash ? (
+                      <p className="break-all font-mono text-slate-200">
+                        {doc.registry_hash}
+                      </p>
+                    ) : (
+                      <p className="italic text-slate-500">
+                        {doc.academic_year
+                          ? `${doc.academic_year} için eşleşen resmi kayıt yok`
+                          : "Öğrenci akademik yıl seçmemiş"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {doc.hashes_equal || doc.registry_match ? (
+                  <p className="mt-3 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm font-bold text-emerald-200">
+                    Hashler aynı — resmi kayıt defteri ile birebir eşleşme
+                    {doc.registry_academic_year
+                      ? ` (${doc.registry_academic_year})`
+                      : doc.registry_filename
+                        ? ` (${doc.registry_filename})`
+                        : ""}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-sm text-amber-200">
+                    Hashler farklı veya resmi kayıtta karşılık yok — manuel inceleme gerekir
+                  </p>
+                )}
+              </div>
+
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <DocumentDownloadButton
                   doc={doc}

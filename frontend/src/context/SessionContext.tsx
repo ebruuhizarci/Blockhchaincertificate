@@ -10,7 +10,9 @@ import {
   getStoredUser,
   loginUser,
   logoutUser,
-  registerUser,
+  startRegistration,
+  verifyRegistration,
+  type RegisterStartResponse,
   type User,
 } from "@/lib/auth";
 import {
@@ -27,7 +29,17 @@ type SessionContextValue = {
   user: User | null;
   institution: Institution | null;
   loginUser: (email: string, password: string) => Promise<void>;
-  registerUser: (email: string, password: string, fullName: string) => Promise<void>;
+  startRegistration: (
+    email: string,
+    password: string,
+    fullName: string,
+    phone: string
+  ) => Promise<RegisterStartResponse>;
+  verifyRegistration: (
+    sessionId: string,
+    smsCode: string,
+    emailCode: string
+  ) => Promise<void>;
   logoutUser: () => void;
   loginInstitution: (code: string, password: string) => Promise<void>;
   logoutInstitution: () => void;
@@ -66,11 +78,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }, []);
 
-  const registerUserHandler = useCallback(
-    async (email: string, password: string, fullName: string) => {
+  const startRegistrationHandler = useCallback(
+    async (email: string, password: string, fullName: string, phone: string) => {
       logoutInstitution();
       setInstitution(null);
-      const u = await registerUser(email, password, fullName);
+      return startRegistration(email, password, fullName, phone);
+    },
+    []
+  );
+
+  const verifyRegistrationHandler = useCallback(
+    async (sessionId: string, smsCode: string, emailCode: string) => {
+      const u = await verifyRegistration(sessionId, smsCode, emailCode);
       setUser(u);
     },
     []
@@ -102,7 +121,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       institution,
       loginUser: loginUserHandler,
-      registerUser: registerUserHandler,
+      startRegistration: startRegistrationHandler,
+      verifyRegistration: verifyRegistrationHandler,
       logoutUser: logoutUserHandler,
       loginInstitution: loginInstitutionHandler,
       logoutInstitution: logoutInstitutionHandler,
@@ -112,7 +132,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       institution,
       loginUserHandler,
-      registerUserHandler,
+      startRegistrationHandler,
+      verifyRegistrationHandler,
       logoutUserHandler,
       loginInstitutionHandler,
       logoutInstitutionHandler,
@@ -136,7 +157,8 @@ export function useAuth() {
   return {
     user: s.user,
     login: s.loginUser,
-    register: s.registerUser,
+    startRegistration: s.startRegistration,
+    verifyRegistration: s.verifyRegistration,
     logout: s.logoutUser,
   };
 }

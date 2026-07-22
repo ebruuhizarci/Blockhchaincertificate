@@ -14,7 +14,8 @@ import {
   type PaymentConfig,
 } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
-import { INSTITUTION_OPTIONS } from "@/config/institutions";
+import { useInstitutionOptions } from "@/hooks/useInstitutionOptions";
+import { getAcademicYearOptions } from "@/lib/academicYear";
 
 type PaymentMethod = "card" | "wallet";
 
@@ -24,11 +25,13 @@ type Props = {
 
 export function DocumentUpload({ onSuccess }: Props) {
   const { user } = useAuth();
+  const { options: institutionOptions } = useInstitutionOptions();
   const { provider, connect } = useWallet();
   const [file, setFile] = useState<File | null>(null);
   const [hash, setHash] = useState<string | null>(null);
   const [uploader, setUploader] = useState(user?.full_name ?? "");
   const [institution, setInstitution] = useState("BEUN");
+  const [academicYear, setAcademicYear] = useState(getAcademicYearOptions()[0]);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -93,7 +96,13 @@ export function DocumentUpload({ onSuccess }: Props) {
       if (already) {
         toast("Bu belge zaten blockchain'de kayıtlı.", { icon: "ℹ️" });
         try {
-          const meta = await uploadDocumentMeta(file, uploader, institution, user.email);
+          const meta = await uploadDocumentMeta(
+            file,
+            uploader,
+            institution,
+            user.email,
+            academicYear
+          );
           if (meta.file_archived) toast.success(meta.message ?? "Dosya arşive eklendi");
         } catch (metaErr) {
           toast.error(getApiErrorMessage(metaErr));
@@ -107,7 +116,8 @@ export function DocumentUpload({ onSuccess }: Props) {
         file,
         uploader,
         institution,
-        user.email
+        user.email,
+        academicYear
       );
       toast.dismiss("pay");
       if (payConfig?.mock_mode) {
@@ -141,7 +151,13 @@ export function DocumentUpload({ onSuccess }: Props) {
       if (already) {
         toast("Bu belge zaten blockchain'de kayıtlı.", { icon: "ℹ️", id: "tx" });
         try {
-          const meta = await uploadDocumentMeta(file, uploader, institution, user.email);
+          const meta = await uploadDocumentMeta(
+            file,
+            uploader,
+            institution,
+            user.email,
+            academicYear
+          );
           if (meta.file_archived) {
             toast.success(meta.message ?? "Dosya arşive eklendi");
           } else {
@@ -170,7 +186,13 @@ export function DocumentUpload({ onSuccess }: Props) {
       });
 
       try {
-        const meta = await uploadDocumentMeta(file, uploader, institution, user.email);
+        const meta = await uploadDocumentMeta(
+          file,
+          uploader,
+          institution,
+          user.email,
+          academicYear
+        );
         if (meta.error) {
           toast(meta.message ?? meta.error, { icon: "ℹ️" });
         } else {
@@ -230,9 +252,21 @@ export function DocumentUpload({ onSuccess }: Props) {
           disabled={!user}
           className="ether-input"
         >
-          {INSTITUTION_OPTIONS.map((i) => (
+          {institutionOptions.map((i) => (
             <option key={i.code} value={i.code}>
               {i.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={academicYear}
+          onChange={(e) => setAcademicYear(e.target.value)}
+          disabled={!user}
+          className="ether-input"
+        >
+          {getAcademicYearOptions().map((y) => (
+            <option key={y} value={y}>
+              Akademik yıl: {y}
             </option>
           ))}
         </select>

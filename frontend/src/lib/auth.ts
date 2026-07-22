@@ -28,24 +28,65 @@ type AuthResponse = {
   error?: string;
 };
 
-export async function registerUser(
+export type RegisterStartResponse = {
+  message?: string;
+  session_id: string;
+  expires_in_minutes?: number;
+  mock_mode?: boolean;
+  dev_sms_code?: string;
+  dev_email_code?: string;
+  error?: string;
+};
+
+export async function startRegistration(
   email: string,
   password: string,
-  fullName: string
+  fullName: string,
+  phone: string
+): Promise<RegisterStartResponse> {
+  try {
+    const { data, res } = await apiFetch<RegisterStartResponse>(
+      "/auth/register/start",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName,
+          phone,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(data.error ?? "Doğrulama kodları gönderilemedi.");
+    }
+
+    return data;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e));
+  }
+}
+
+export async function verifyRegistration(
+  sessionId: string,
+  smsCode: string,
+  emailCode: string
 ): Promise<User> {
   try {
-    const { data, res } = await apiFetch<AuthResponse>("/auth/register", {
+    const { data, res } = await apiFetch<AuthResponse>("/auth/register/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email,
-        password,
-        full_name: fullName,
+        session_id: sessionId,
+        sms_code: smsCode,
+        email_code: emailCode,
       }),
     });
 
     if (!res.ok) {
-      throw new Error(data.error ?? "Kayıt işlemi başarısız oldu.");
+      throw new Error(data.error ?? "Doğrulama başarısız oldu.");
     }
 
     setStoredUser(data.user);
@@ -53,6 +94,15 @@ export async function registerUser(
   } catch (e) {
     throw new Error(getApiErrorMessage(e));
   }
+}
+
+/** @deprecated startRegistration + verifyRegistration kullanın */
+export async function registerUser(
+  email: string,
+  password: string,
+  fullName: string
+): Promise<User> {
+  throw new Error("Kayıt için telefon ve iki aşamalı doğrulama gereklidir.");
 }
 
 export async function loginUser(

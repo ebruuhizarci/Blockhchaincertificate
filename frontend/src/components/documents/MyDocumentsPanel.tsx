@@ -50,6 +50,7 @@ function DocumentRow({
           <p className="font-semibold text-white">{doc.filename}</p>
           <p className="mt-1 text-xs text-slate-400">
             {INSTITUTION_LABELS[doc.institution] ?? doc.institution}
+            {doc.academic_year ? ` · ${doc.academic_year}` : ""}
             {doc.date ? ` · ${doc.date}` : ""}
           </p>
         </div>

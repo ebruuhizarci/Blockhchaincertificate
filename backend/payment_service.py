@@ -12,6 +12,7 @@ from database import (
     get_payment_session,
     insert_document,
     set_document_blockchain_tx,
+    update_document_academic_year,
     update_payment_session,
 )
 from file_storage import has_stored_file, save_document_file
@@ -42,6 +43,7 @@ def start_card_payment(
     target_institution: str,
     user_email: str,
     buyer_ip: str,
+    academic_year: str | None = None,
 ) -> dict:
     if not relayer_configured():
         return {
@@ -73,6 +75,7 @@ def start_card_payment(
             filename=filename,
             file_hash=file_hash,
             amount_try=amount,
+            academic_year=academic_year,
         )
         pending_pdf_path(session_id).write_bytes(file_content)
 
@@ -227,10 +230,13 @@ def complete_payment(session_id: str, token: str, *, mock: bool = False) -> dict
             )
 
         existing = get_document_by_file_hash(conn, file_hash)
+        session_year = session.get("academic_year")
         if existing:
             doc_id = existing["id"]
             if tx_hash and tx_hash != "already_on_chain":
                 set_document_blockchain_tx(conn, doc_id, tx_hash)
+            if session_year:
+                update_document_academic_year(conn, doc_id, session_year)
         else:
             doc_id = insert_document(
                 conn,
@@ -239,6 +245,7 @@ def complete_payment(session_id: str, token: str, *, mock: bool = False) -> dict
                 session["uploader_name"],
                 session["target_institution"],
                 session["user_email"],
+                session_year,
             )
             if tx_hash and tx_hash != "already_on_chain":
                 set_document_blockchain_tx(conn, doc_id, tx_hash)

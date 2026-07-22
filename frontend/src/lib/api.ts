@@ -1,11 +1,15 @@
 import { apiFetch, ApiError, getApiErrorMessage } from "./http";
+import { institutionAuthHeaders } from "./institutionAuth";
 
 export type VerifyResponse = {
   exists: boolean;
+  doc_id?: number;
   filename?: string;
   institution?: string;
   status?: string;
   blockchain_info?: string | null;
+  has_file?: boolean;
+  can_view?: boolean;
   message?: string;
   error?: string;
 };
@@ -17,6 +21,8 @@ export type UploadResponse = {
   error?: string;
   file_archived?: boolean;
   doc_id?: number;
+  academic_year?: string | null;
+  registry_match?: boolean;
 };
 
 export type MyDocument = {
@@ -28,6 +34,16 @@ export type MyDocument = {
   blockchain_tx: string | null;
   date: string | null;
   has_file?: boolean;
+  academic_year?: string | null;
+  registry_match?: boolean;
+};
+
+export type RegistryDocument = {
+  id: number;
+  academic_year: string;
+  filename: string;
+  file_hash: string;
+  created_at: string | null;
 };
 
 export type MyDocumentsResponse = {
@@ -73,7 +89,8 @@ export async function uploadDocumentMeta(
   file: File,
   uploaderName: string,
   targetInstitution: string,
-  userEmail?: string
+  userEmail?: string,
+  academicYear?: string
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
@@ -81,6 +98,9 @@ export async function uploadDocumentMeta(
   form.append("target_institution", targetInstitution);
   if (userEmail?.trim()) {
     form.append("user_email", userEmail.trim());
+  }
+  if (academicYear?.trim()) {
+    form.append("academic_year", academicYear.trim());
   }
 
   const { data, res } = await apiFetch<UploadResponse>("/upload", {
@@ -120,6 +140,7 @@ export async function archiveDocumentFile(
     error?: string;
   }>(`/documents/${docId}/archive`, {
     method: "POST",
+    headers: access.institutionCode ? institutionAuthHeaders() : undefined,
     body: form,
   });
 
@@ -136,6 +157,13 @@ export type PendingInstitutionDoc = {
   date: string | null;
   file_hash: string;
   has_file?: boolean;
+  academic_year?: string | null;
+  registry_match?: boolean;
+  hashes_equal?: boolean;
+  student_hash?: string;
+  registry_hash?: string;
+  registry_filename?: string;
+  registry_academic_year?: string;
 };
 
 export async function fetchPendingInstitutionDocs(
@@ -143,7 +171,8 @@ export async function fetchPendingInstitutionDocs(
 ): Promise<PendingInstitutionDoc[]> {
   const code = encodeURIComponent(institutionCode);
   const { data, res } = await apiFetch<PendingInstitutionDoc[] | { error?: string }>(
-    `/pending-docs/${code}`
+    `/pending-docs/${code}`,
+    { headers: institutionAuthHeaders() }
   );
   if (!res.ok) {
     const err = !Array.isArray(data) && data.error ? data.error : "Liste alınamadı";
@@ -192,13 +221,17 @@ export async function initIyzicoPayment(
   file: File,
   uploaderName: string,
   targetInstitution: string,
-  userEmail: string
+  userEmail: string,
+  academicYear?: string
 ): Promise<PaymentInitResponse> {
   const form = new FormData();
   form.append("file", file);
   form.append("uploader_name", uploaderName);
   form.append("target_institution", targetInstitution);
   form.append("user_email", userEmail);
+  if (academicYear?.trim()) {
+    form.append("academic_year", academicYear.trim());
+  }
 
   const { data, res } = await apiFetch<PaymentInitResponse>("/payments/iyzico/init", {
     method: "POST",
@@ -234,7 +267,10 @@ export async function updateDocumentStatus(
     "/update-status",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...institutionAuthHeaders(),
+      },
       body: JSON.stringify({
         id: docId,
         status,
@@ -246,6 +282,63 @@ export async function updateDocumentStatus(
     throw new Error(data.error ?? "Durum güncellenemedi");
   }
   return data;
+}
+
+export async function autoApproveFromRegistry(
+  docId: number,
+  userEmail?: string,
+  uploaderName?: string
+): Promise<{ message?: string; error?: string }> {
+  const { data, res } = await apiFetch<{ message?: string; error?: string }>(
+    `/documents/${docId}/auto-approve-registry`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_email: userEmail,
+        uploader_name: uploaderName,
+      }),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(data.error ?? "Otomatik onay başarısız");
+  }
+  return data;
+}
+
+export async function fetchRegistryDocuments(
+  academicYear?: string
+): Promise<RegistryDocument[]> {
+  const params = academicYear ? `?academic_year=${encodeURIComponent(academicYear)}` : "";
+  const { data, res } = await apiFetch<{ items?: RegistryDocument[]; error?: string }>(
+    `/institution/registry${params}`,
+    { headers: institutionAuthHeaders() }
+  );
+  if (!res.ok) throw new Error(data.error ?? "Kayıt defteri alınamadı");
+  return data.items ?? [];
+}
+
+export async function uploadRegistryDocument(
+  file: File,
+  academicYear: string
+): Promise<void> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("academic_year", academicYear);
+  const { data, res } = await apiFetch<{ error?: string }>("/institution/registry", {
+    method: "POST",
+    headers: institutionAuthHeaders(),
+    body: form,
+  });
+  if (!res.ok) throw new Error(data.error ?? "Kayıt defterine eklenemedi");
+}
+
+export async function deleteRegistryDocument(entryId: number): Promise<void> {
+  const { data, res } = await apiFetch<{ error?: string }>(
+    `/institution/registry/${entryId}`,
+    { method: "DELETE", headers: institutionAuthHeaders() }
+  );
+  if (!res.ok) throw new Error(data.error ?? "Kayıt silinemedi");
 }
 
 export { getApiErrorMessage, ApiError };

@@ -71,6 +71,7 @@ def _init_sqlite(conn):
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             full_name TEXT NOT NULL,
+            phone TEXT,
             is_banned INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -80,6 +81,11 @@ def _init_sqlite(conn):
         cur.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0")
     except Exception:
         pass
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    except Exception:
+        pass
+    _ensure_registration_verifications_sqlite(cur)
     _ensure_institutions_sqlite(cur)
     conn.commit()
     cur.close()
@@ -115,6 +121,8 @@ def _ensure_institutions_sqlite(cur):
             password_hash TEXT NOT NULL,
             rsa_public_key_pem TEXT,
             rsa_private_key_pem TEXT,
+            is_suspended INTEGER NOT NULL DEFAULT 0,
+            password_version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -124,9 +132,63 @@ def _ensure_institutions_sqlite(cur):
             cur.execute(f"ALTER TABLE institutions ADD COLUMN {col} TEXT")
         except Exception:
             pass
+    for col, default in (("is_suspended", "0"), ("password_version", "1")):
+        try:
+            cur.execute(
+                f"ALTER TABLE institutions ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}"
+            )
+        except Exception:
+            pass
     cur.execute("SELECT COUNT(*) FROM institutions")
     if cur.fetchone()[0] == 0:
         _seed_institutions(cur, "?")
+
+
+def _ensure_registration_verifications_sqlite(cur):
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS registration_verifications (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            sms_code_hash TEXT NOT NULL,
+            email_code_hash TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+
+def ensure_registration_verification_schema(conn):
+    """Kayıt doğrulama bekleyen kayıtlar tablosu."""
+    if conn.__class__.__module__.startswith("sqlite3"):
+        cur = conn.cursor()
+        _ensure_registration_verifications_sqlite(cur)
+        conn.commit()
+        cur.close()
+        return
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS registration_verifications (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            sms_code_hash TEXT NOT NULL,
+            email_code_hash TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.commit()
+    cur.close()
 
 
 def ensure_users_schema(conn):
@@ -135,6 +197,10 @@ def ensure_users_schema(conn):
         cur = conn.cursor()
         try:
             cur.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE users ADD COLUMN phone TEXT")
         except Exception:
             pass
         conn.commit()
@@ -149,12 +215,14 @@ def ensure_users_schema(conn):
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             full_name TEXT NOT NULL,
+            phone TEXT,
             is_banned BOOLEAN NOT NULL DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT")
     conn.commit()
     cur.close()
 
@@ -165,6 +233,10 @@ def ensure_documents_schema(conn):
         cur = conn.cursor()
         try:
             cur.execute("ALTER TABLE documents ADD COLUMN user_email TEXT")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE documents ADD COLUMN academic_year TEXT")
         except Exception:
             pass
         conn.commit()
@@ -272,6 +344,7 @@ def ensure_documents_schema(conn):
         ("is_encrypted", "INTEGER NOT NULL DEFAULT 0"),
         ("encrypted_aes_key", "TEXT"),
         ("aes_nonce", "TEXT"),
+        ("academic_year", "TEXT"),
     ):
         cur.execute(
             f"ALTER TABLE documents ADD COLUMN IF NOT EXISTS {col} {col_type}"
@@ -576,7 +649,7 @@ def fetch_documents_for_user(
         cur.execute(
             f"""
             SELECT id, filename, file_hash, target_institution, status,
-                   blockchain_tx_hash, created_at
+                   blockchain_tx_hash, created_at, academic_year
             FROM documents
             WHERE {where}
             ORDER BY id DESC
@@ -604,7 +677,7 @@ def fetch_documents_for_user(
         cur.execute(
             f"""
             SELECT id, filename, file_hash, target_institution, status,
-                   blockchain_tx_hash, created_at
+                   blockchain_tx_hash, created_at, academic_year
             FROM documents
             WHERE {where}
             ORDER BY id DESC
@@ -616,7 +689,8 @@ def fetch_documents_for_user(
     cur.close()
     out = []
     for row in rows:
-        out.append({
+        academic_year = row[7] if len(row) > 7 else None
+        item = {
             "id": row[0],
             "filename": row[1],
             "file_hash": row[2],
@@ -624,7 +698,15 @@ def fetch_documents_for_user(
             "status": row[4],
             "blockchain_tx": row[5],
             "date": str(row[6]) if row[6] else None,
-        })
+            "academic_year": academic_year,
+        }
+        item["registry_match"] = registry_hash_matches(
+            conn,
+            item["institution"],
+            academic_year,
+            item["file_hash"],
+        )
+        out.append(item)
     return out
 
 
@@ -710,7 +792,7 @@ def fetch_pending_documents_for_institution(
         doc_cols = _pg_column_names(cur, "documents")
 
     select_cols = ["id", "filename", "file_hash"]
-    for optional in ("uploader_name", "user_email", "student_id", "created_at", "target_institution"):
+    for optional in ("uploader_name", "user_email", "student_id", "created_at", "target_institution", "academic_year"):
         if optional in doc_cols:
             select_cols.append(optional)
 
@@ -755,13 +837,28 @@ def fetch_pending_documents_for_institution(
     out: list[dict] = []
     for row in rows:
         doc = {select_cols[i]: row[i] for i in range(len(select_cols))}
-        out.append({
+        academic_year = doc.get("academic_year")
+        student_hash = doc["file_hash"]
+        registry = find_registry_entry(conn, institution_name, academic_year, student_hash)
+        hashes_equal = registry is not None
+        item = {
             "id": doc["id"],
             "filename": doc["filename"],
             "uploader": _resolve_document_uploader(conn, doc, profile_cache),
             "date": str(doc["created_at"]) if doc.get("created_at") else None,
-            "file_hash": doc["file_hash"],
-        })
+            "file_hash": student_hash,
+            "academic_year": academic_year,
+            "registry_match": hashes_equal,
+            "hashes_equal": hashes_equal,
+            "student_hash": student_hash,
+        }
+        if registry:
+            item["registry_hash"] = registry["file_hash"]
+            item["registry_filename"] = registry["filename"]
+            item["registry_academic_year"] = registry["academic_year"]
+            if not academic_year and registry.get("academic_year"):
+                item["academic_year"] = registry["academic_year"]
+        out.append(item)
 
     cur.close()
     return out
@@ -803,6 +900,7 @@ def insert_document(
     uploader_name: str,
     target_institution: str,
     user_email: str | None = None,
+    academic_year: str | None = None,
 ) -> int:
     """documents tablosuna satır ekler; yeni kaydın id değerini döner."""
     ensure_documents_schema(conn)
@@ -820,10 +918,20 @@ def insert_document(
     if is_sqlite:
         cur.execute(
             """
-            INSERT INTO documents (filename, file_hash, uploader_name, target_institution, status, user_email)
-            VALUES (?, ?, ?, ?, 'pending', ?)
+            INSERT INTO documents (
+                filename, file_hash, uploader_name, target_institution,
+                status, user_email, academic_year
+            )
+            VALUES (?, ?, ?, ?, 'pending', ?, ?)
             """,
-            (filename, file_hash, uploader_name, target_institution, user_email),
+            (
+                filename,
+                file_hash,
+                uploader_name,
+                target_institution,
+                user_email,
+                academic_year,
+            ),
         )
         doc_id = int(cur.lastrowid)
     else:
@@ -835,6 +943,8 @@ def insert_document(
             "target_institution": db_institution,
             "status": "pending",
         }
+        if academic_year and "academic_year" in cols:
+            row["academic_year"] = academic_year
         if "uploader_name" in cols:
             row["uploader_name"] = uploader_name
         if "user_email" in cols and user_email:
@@ -909,6 +1019,40 @@ def ensure_payments_schema(conn):
             )
             """
         )
+    try:
+        if is_sqlite:
+            cur.execute("ALTER TABLE payment_sessions ADD COLUMN academic_year TEXT")
+        else:
+            cur.execute(
+                "ALTER TABLE payment_sessions ADD COLUMN IF NOT EXISTS academic_year TEXT"
+            )
+    except Exception:
+        pass
+    conn.commit()
+    cur.close()
+
+
+def update_document_academic_year(
+    conn,
+    doc_id: int,
+    academic_year: str | None,
+) -> None:
+    year = normalize_academic_year(academic_year)
+    if not year:
+        return
+    ensure_documents_schema(conn)
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    ph = "?" if is_sqlite else "%s"
+    cur.execute(
+        f"""
+        UPDATE documents
+        SET academic_year = {ph}
+        WHERE id = {ph}
+          AND (academic_year IS NULL OR TRIM(academic_year) = '')
+        """,
+        (year, doc_id),
+    )
     conn.commit()
     cur.close()
 
@@ -923,17 +1067,19 @@ def create_payment_session(
     filename: str,
     file_hash: str,
     amount_try: float = 50.0,
+    academic_year: str | None = None,
 ) -> None:
     ensure_payments_schema(conn)
     cur = conn.cursor()
     is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    year = normalize_academic_year(academic_year)
     if is_sqlite:
         cur.execute(
             """
             INSERT INTO payment_sessions (
                 id, user_email, uploader_name, target_institution,
-                filename, file_hash, amount_try, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+                filename, file_hash, amount_try, status, academic_year
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
             """,
             (
                 session_id,
@@ -943,6 +1089,7 @@ def create_payment_session(
                 filename,
                 file_hash,
                 amount_try,
+                year,
             ),
         )
     else:
@@ -950,8 +1097,8 @@ def create_payment_session(
             """
             INSERT INTO payment_sessions (
                 id, user_email, uploader_name, target_institution,
-                filename, file_hash, amount_try, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending')
+                filename, file_hash, amount_try, status, academic_year
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending', %s)
             """,
             (
                 session_id,
@@ -961,6 +1108,7 @@ def create_payment_session(
                 filename,
                 file_hash,
                 amount_try,
+                year,
             ),
         )
     conn.commit()
@@ -976,7 +1124,8 @@ def get_payment_session(conn, session_id: str) -> dict | None:
         f"""
         SELECT id, user_email, uploader_name, target_institution, filename,
                file_hash, amount_try, status, iyzico_token, payment_status,
-               doc_id, blockchain_tx_hash, error_message, created_at, paid_at
+               doc_id, blockchain_tx_hash, error_message, created_at, paid_at,
+               academic_year
         FROM payment_sessions WHERE id = {ph}
         """,
         (session_id,),
@@ -1001,6 +1150,7 @@ def get_payment_session(conn, session_id: str) -> dict | None:
         "error_message": row[12],
         "created_at": row[13],
         "paid_at": row[14],
+        "academic_year": row[15] if len(row) > 15 else None,
     }
 
 
@@ -1080,6 +1230,216 @@ def get_document_by_file_hash(conn, file_hash: str) -> dict | None:
     }
 
 
+def ensure_institution_registry_schema(conn):
+    """Kurum resmi belge kayıt defteri (akademik yıl + hash)."""
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    if is_sqlite:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS institution_registry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                institution_code TEXT NOT NULL,
+                academic_year TEXT NOT NULL,
+                file_hash TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(institution_code, academic_year, file_hash)
+            )
+            """
+        )
+    else:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS institution_registry (
+                id SERIAL PRIMARY KEY,
+                institution_code TEXT NOT NULL,
+                academic_year TEXT NOT NULL,
+                file_hash TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(institution_code, academic_year, file_hash)
+            )
+            """
+        )
+    conn.commit()
+    cur.close()
+
+
+def normalize_academic_year(raw: str | None) -> str | None:
+    import re
+
+    value = (raw or "").strip()
+    if not value:
+        return None
+    if re.fullmatch(r"\d{4}-\d{4}", value):
+        start, end = value.split("-")
+        if int(end) == int(start) + 1:
+            return value
+    return None
+
+
+def find_registry_entry(
+    conn,
+    institution_code: str,
+    academic_year: str | None,
+    file_hash: str,
+) -> dict | None:
+    if not file_hash:
+        return None
+    year = normalize_academic_year(academic_year)
+    ensure_institution_registry_schema(conn)
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    ph = "?" if is_sqlite else "%s"
+    try:
+        for code in institution_code_variants(institution_code):
+            if year:
+                cur.execute(
+                    f"""
+                    SELECT id, filename, file_hash, academic_year
+                    FROM institution_registry
+                    WHERE institution_code = {ph}
+                      AND academic_year = {ph}
+                      AND file_hash = {ph}
+                    LIMIT 1
+                    """,
+                    (code, year, file_hash),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT id, filename, file_hash, academic_year
+                    FROM institution_registry
+                    WHERE institution_code = {ph}
+                      AND file_hash = {ph}
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (code, file_hash),
+                )
+            row = cur.fetchone()
+            if row:
+                return {
+                    "id": row[0],
+                    "filename": row[1],
+                    "file_hash": row[2],
+                    "academic_year": row[3],
+                }
+        return None
+    finally:
+        cur.close()
+
+
+def registry_hash_matches(
+    conn,
+    institution_code: str,
+    academic_year: str | None,
+    file_hash: str,
+) -> bool:
+    return find_registry_entry(conn, institution_code, academic_year, file_hash) is not None
+
+
+def insert_registry_document(
+    conn,
+    institution_code: str,
+    academic_year: str,
+    file_hash: str,
+    filename: str,
+) -> int:
+    ensure_institution_registry_schema(conn)
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    code = institution_code_variants(institution_code)[0]
+    year = normalize_academic_year(academic_year)
+    if not year:
+        raise ValueError("Geçerli akademik yıl gerekli (örn. 2025-2026)")
+    if is_sqlite:
+        cur.execute(
+            """
+            INSERT INTO institution_registry (
+                institution_code, academic_year, file_hash, filename
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (code, year, file_hash, filename),
+        )
+        conn.commit()
+        reg_id = int(cur.lastrowid)
+    else:
+        cur.execute(
+            """
+            INSERT INTO institution_registry (
+                institution_code, academic_year, file_hash, filename
+            ) VALUES (%s, %s, %s, %s)
+            RETURNING id
+            """,
+            (code, year, file_hash, filename),
+        )
+        reg_id = int(cur.fetchone()[0])
+        conn.commit()
+    cur.close()
+    return reg_id
+
+
+def list_registry_documents(
+    conn,
+    institution_code: str,
+    academic_year: str | None = None,
+) -> list[dict]:
+    ensure_institution_registry_schema(conn)
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    ph = "?" if is_sqlite else "%s"
+    code = institution_code_variants(institution_code)[0]
+    params: list = [code]
+    year_filter = ""
+    if academic_year:
+        year = normalize_academic_year(academic_year)
+        if year:
+            year_filter = f" AND academic_year = {ph}"
+            params.append(year)
+    cur.execute(
+        f"""
+        SELECT id, academic_year, filename, file_hash, created_at
+        FROM institution_registry
+        WHERE institution_code = {ph}{year_filter}
+        ORDER BY academic_year DESC, id DESC
+        """,
+        tuple(params),
+    )
+    rows = cur.fetchall()
+    cur.close()
+    return [
+        {
+            "id": row[0],
+            "academic_year": row[1],
+            "filename": row[2],
+            "file_hash": row[3],
+            "created_at": str(row[4]) if row[4] else None,
+        }
+        for row in rows
+    ]
+
+
+def delete_registry_document(conn, entry_id: int, institution_code: str) -> bool:
+    ensure_institution_registry_schema(conn)
+    cur = conn.cursor()
+    is_sqlite = conn.__class__.__module__.startswith("sqlite3")
+    ph = "?" if is_sqlite else "%s"
+    code = institution_code_variants(institution_code)[0]
+    cur.execute(
+        f"""
+        DELETE FROM institution_registry
+        WHERE id = {ph} AND institution_code = {ph}
+        """,
+        (entry_id, code),
+    )
+    conn.commit()
+    deleted = cur.rowcount > 0
+    cur.close()
+    return deleted
+
+
 def ensure_institutions_schema(conn):
     """PostgreSQL veya mevcut bağlantıda kurum tablosunu hazırlar."""
     cur = conn.cursor()
@@ -1110,6 +1470,12 @@ def ensure_institutions_schema(conn):
         cur.execute(
             "ALTER TABLE institutions ADD COLUMN IF NOT EXISTS rsa_private_key_pem TEXT"
         )
+        cur.execute(
+            "ALTER TABLE institutions ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN NOT NULL DEFAULT FALSE"
+        )
+        cur.execute(
+            "ALTER TABLE institutions ADD COLUMN IF NOT EXISTS password_version INTEGER NOT NULL DEFAULT 1"
+        )
         cur.execute("SELECT COUNT(*) FROM institutions")
         if cur.fetchone()[0] == 0:
             _seed_institutions(cur, "%s")
@@ -1122,9 +1488,12 @@ def _get_sqlite_connection():
     db_path = Path(__file__).resolve().parent / "local.db"
     conn = sqlite3.connect(db_path, timeout=30, check_same_thread=False)
     _init_sqlite(conn)
+    ensure_users_schema(conn)
+    ensure_registration_verification_schema(conn)
     ensure_payments_schema(conn)
     ensure_documents_encryption_schema(conn)
     ensure_institutions_schema(conn)
+    ensure_institution_registry_schema(conn)
     _set_last_error("SQLite fallback aktif")
     return conn
 
@@ -1156,11 +1525,13 @@ def get_db_connection():
         )
         _set_last_error("PostgreSQL bağlantısı aktif")
         ensure_users_schema(conn)
+        ensure_registration_verification_schema(conn)
         ensure_documents_schema(conn)
         ensure_institutions_schema(conn)
         ensure_profiles_schema(conn)
         ensure_payments_schema(conn)
         ensure_documents_encryption_schema(conn)
+        ensure_institution_registry_schema(conn)
         return conn
     except Exception as e:
         _set_last_error(f"PostgreSQL bağlantı hatası: {e}. SQLite fallback aktif.")

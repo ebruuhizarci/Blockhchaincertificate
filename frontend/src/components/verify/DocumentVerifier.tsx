@@ -8,17 +8,24 @@ import {
 import { verifyOnChain } from "@/lib/contract";
 import { parseBlockchainError } from "@/lib/errors";
 import { verifyDocumentOffChain, ApiError } from "@/lib/api";
+import {
+  downloadPublicVerifiedDocument,
+  openPublicVerifiedDocument,
+} from "@/lib/documents";
+import { getApiErrorMessage } from "@/lib/http";
 import { Spinner } from "@/components/ui/Spinner";
 import { getTargetChain } from "@/config/chains";
 import { INSTITUTION_LABELS } from "@/config/institutions";
 
 type VerifyResult = {
+  fileHash: string;
   onChain: boolean;
   offChain: boolean;
   institution?: string;
   filename?: string;
   status?: string;
   tx?: string | null;
+  canView?: boolean;
   backendOffline?: boolean;
 };
 
@@ -31,6 +38,7 @@ export function DocumentVerifier({ initialHash = "", verifyTick = 0 }: Props) {
   const [query, setQuery] = useState(initialHash);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [fileBusy, setFileBusy] = useState(false);
   const chain = getTargetChain();
 
   const runVerify = async (fileHash: string) => {
@@ -54,6 +62,7 @@ export function DocumentVerifier({ initialHash = "", verifyTick = 0 }: Props) {
       let filename: string | undefined;
       let status: string | undefined;
       let tx: string | null | undefined;
+      let canView = false;
 
       let backendOffline = false;
       try {
@@ -63,6 +72,7 @@ export function DocumentVerifier({ initialHash = "", verifyTick = 0 }: Props) {
         filename = db.filename;
         status = db.status;
         tx = db.blockchain_info ?? null;
+        canView = !!db.can_view;
       } catch (err) {
         backendOffline = err instanceof ApiError && err.code === "BACKEND_OFFLINE";
         if (!backendOffline) {
@@ -71,12 +81,14 @@ export function DocumentVerifier({ initialHash = "", verifyTick = 0 }: Props) {
       }
 
       setResult({
+        fileHash: clean,
         onChain,
         offChain,
         institution,
         filename,
         status,
         tx,
+        canView,
         backendOffline,
       });
 
@@ -198,6 +210,40 @@ export function DocumentVerifier({ initialHash = "", verifyTick = 0 }: Props) {
             {result!.backendOffline && (
               <p className="mt-3 text-left text-[10px] text-amber-300">
                 Backend kapalı — sadece zincir sonucu gösterildi.
+              </p>
+            )}
+            {result!.canView && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2 border-t border-emerald-500/20 pt-4">
+                <button
+                  type="button"
+                  disabled={fileBusy}
+                  onClick={() => openPublicVerifiedDocument(result!.fileHash)}
+                  className="ether-btn-emerald !py-2 !text-[10px]"
+                >
+                  Belgeyi görüntüle
+                </button>
+                <button
+                  type="button"
+                  disabled={fileBusy}
+                  onClick={() => {
+                    setFileBusy(true);
+                    void downloadPublicVerifiedDocument(
+                      result!.fileHash,
+                      result!.filename ?? "belge.pdf"
+                    )
+                      .then(() => toast.success("İndirme başladı"))
+                      .catch((e) => toast.error(getApiErrorMessage(e)))
+                      .finally(() => setFileBusy(false));
+                  }}
+                  className="ether-btn-secondary !py-2 !text-[10px]"
+                >
+                  {fileBusy ? "İndiriliyor..." : "Belgeyi indir"}
+                </button>
+              </div>
+            )}
+            {result!.status === "approved" && !result!.canView && !result!.backendOffline && (
+              <p className="mt-3 text-left text-[10px] text-amber-300">
+                Belge onaylı ancak dosya arşivde yok; yalnızca hash doğrulaması yapılabilir.
               </p>
             )}
           </div>

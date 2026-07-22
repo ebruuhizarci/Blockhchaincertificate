@@ -111,6 +111,19 @@ def has_stored_file(
     )
 
 
+def save_registry_file(
+    institution_code: str,
+    academic_year: str,
+    file_hash: str,
+    content: bytes,
+) -> Path:
+    folder = upload_dir() / "registry" / institution_code / academic_year
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{file_hash}.pdf"
+    path.write_bytes(content)
+    return path
+
+
 # Geriye uyumluluk
 def save_uploaded_file(file_hash: str, filename: str, content: bytes) -> Path:
     upload_dir()

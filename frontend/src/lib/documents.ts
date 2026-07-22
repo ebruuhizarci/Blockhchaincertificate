@@ -1,4 +1,5 @@
 import { API_BASE } from "./http";
+import { institutionAuthHeaders } from "./institutionAuth";
 
 export type DocumentViewAccess = {
   userEmail?: string;
@@ -33,7 +34,9 @@ export async function downloadDocumentFile(
   const url = getDocumentFileUrl(docId, access);
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await fetch(url, {
+      headers: access?.institutionCode ? institutionAuthHeaders() : undefined,
+    });
   } catch {
     throw new Error(
       "Sunucuya bağlanılamadı. Backend'i başlatın: cd backend → python app.py"
@@ -56,6 +59,72 @@ export async function downloadDocumentFile(
     throw new Error(
       "Dosya arşivde yok. «Arşive ekle» ile aynı PDF'i yükleyin."
     );
+  }
+
+  const type = res.headers.get("content-type") || "application/pdf";
+  if (type.includes("json")) {
+    const j = JSON.parse(new TextDecoder().decode(buf)) as { error?: string };
+    throw new Error(j.error ?? "Belge indirilemedi");
+  }
+
+  const blob = new Blob([buf], { type });
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename || "belge.pdf";
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+/** Doğrulama sonrası onaylı belge — giriş gerekmez (hash ile erişim). */
+export function getPublicVerifiedDocumentUrl(
+  fileHash: string,
+  download = false
+): string {
+  const clean = fileHash.replace(/^0x/i, "").toLowerCase();
+  const params = download ? "?download=1" : "";
+  return `${API_BASE}/verify/${clean}/file${params}`;
+}
+
+export function openPublicVerifiedDocument(fileHash: string): void {
+  window.open(
+    getPublicVerifiedDocumentUrl(fileHash, false),
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
+export async function downloadPublicVerifiedDocument(
+  fileHash: string,
+  filename: string
+): Promise<void> {
+  const url = getPublicVerifiedDocumentUrl(fileHash, true);
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    throw new Error(
+      "Sunucuya bağlanılamadı. Backend'i başlatın: cd backend → python app.py"
+    );
+  }
+
+  if (!res.ok) {
+    let msg = "Belge indirilemedi";
+    try {
+      const j = (await res.json()) as { error?: string };
+      if (j.error) msg = j.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+
+  const buf = await res.arrayBuffer();
+  if (buf.byteLength === 0) {
+    throw new Error("Belge dosyası boş veya arşivde yok.");
   }
 
   const type = res.headers.get("content-type") || "application/pdf";

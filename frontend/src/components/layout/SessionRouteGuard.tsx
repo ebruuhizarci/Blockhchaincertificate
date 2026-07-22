@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useSession } from "@/context/SessionContext";
+import { getStoredUser } from "@/lib/auth";
 
 type Props = {
   children: ReactNode;
@@ -19,14 +20,12 @@ export function SessionRouteGuard({
   requireUser,
 }: Props) {
   const { mode, user } = useSession();
+  const activeUser = user ?? getStoredUser();
 
   if (blockInstitution && mode === "institution") {
     return <Navigate to="/kurum/panel" replace />;
   }
-  if (requireUser && mode !== "user") {
-    return <Navigate to="/giris" replace />;
-  }
-  if (requireUser && !user) {
+  if (requireUser && !activeUser) {
     return <Navigate to="/giris" replace />;
   }
   if (institutionOnly) {
